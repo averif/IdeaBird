@@ -54,6 +54,13 @@ async function readApiJson(res) {
     return JSON.parse(body);
   } catch {
     const preview = body.replace(/\s+/g, ' ').trim().slice(0, 120);
+    const isLocalHost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+
+    // Hosts answer a function that ran past its time limit with their own non-JSON page
+    // (Vercel: 504 FUNCTION_INVOCATION_TIMEOUT), not with our JSON error.
+    if (res.status === 504 || /timeout|timed out/i.test(preview)) {
+      throw new Error('IdeaBird took too long to generate and the request timed out. Try again, or use a shorter excerpt.');
+    }
 
     if (res.status === 404 || preview.toLowerCase().includes('page could not be found')) {
       throw new Error('IdeaBird API was not found. Run the full app with npm run dev so the backend starts too.');
@@ -63,7 +70,11 @@ async function readApiJson(res) {
       throw new Error('IdeaBird backend is not running. Start it with npm run dev:server or use npm run dev.');
     }
 
-    throw new Error('IdeaBird received an invalid API response. Make sure the backend is running on http://localhost:3001.');
+    throw new Error(
+      isLocalHost
+        ? 'IdeaBird received an invalid API response. Make sure the backend is running on http://localhost:3001.'
+        : `IdeaBird received an invalid API response (HTTP ${res.status}). Check the Vercel function logs.`
+    );
   }
 }
 

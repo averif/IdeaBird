@@ -1,8 +1,19 @@
 import { generateTweetsWithFallback } from '../server/generateService.js';
 
+// 60s is the highest limit every Vercel plan allows. Reasoning models need ~30-40s for
+// moderation + generation, so the old 30s limit killed requests and Vercel answered
+// with a non-JSON FUNCTION_INVOCATION_TIMEOUT page.
+const MAX_DURATION_SECONDS = 60;
+
 export const config = {
-  maxDuration: 30,
+  maxDuration: MAX_DURATION_SECONDS,
 };
+
+// Stop NVIDIA work before Vercel kills the function, so the client gets a JSON 504.
+const GENERATION_BUDGET_MS = Math.min(
+  Number(process.env.NVIDIA_TOTAL_TIMEOUT_MS || 55000),
+  MAX_DURATION_SECONDS * 1000 - 3000
+);
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -29,7 +40,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const result = await generateTweetsWithFallback(text.trim());
+    const result = await generateTweetsWithFallback(text.trim(), { budgetMs: GENERATION_BUDGET_MS });
     if (result.status === 'policy_block') {
       return res.status(200).json({
         status: 'policy_block',

@@ -5,6 +5,7 @@ import { assertApiKey, generateTweetsWithFallback, NIM_CONFIG } from './generate
 
 const app = express();
 const PORT = process.env.PORT || 3001;
+const GENERATION_BUDGET_MS = Number(process.env.NVIDIA_TOTAL_TIMEOUT_MS) || undefined;
 
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
@@ -28,7 +29,7 @@ app.post('/api/generate', async (req, res) => {
   }
 
   try {
-    const result = await generateTweetsWithFallback(text.trim());
+    const result = await generateTweetsWithFallback(text.trim(), { budgetMs: GENERATION_BUDGET_MS });
     if (result.status === 'policy_block') {
       return res.json({
         status: 'policy_block',

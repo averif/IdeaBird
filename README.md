@@ -102,14 +102,17 @@ In Vercel, add these Environment Variables before redeploying:
 ```env
 NVIDIA_API_KEY=your_key_here
 NVIDIA_BASE_URL=https://integrate.api.nvidia.com/v1
-NVIDIA_MODEL=meta/llama-3.3-70b-instruct
-NVIDIA_TIMEOUT_MS=30000
+NVIDIA_MODEL=openai/gpt-oss-20b
+NVIDIA_TIMEOUT_MS=45000
 NVIDIA_MODEL_ATTEMPTS=1
-NVIDIA_MAX_TOKENS=1600
-NVIDIA_MODERATION_MAX_TOKENS=8
+NVIDIA_MAX_TOKENS=4096
+NVIDIA_MODERATION_MAX_TOKENS=2048
+NVIDIA_TOTAL_TIMEOUT_MS=55000
 ```
 
 Only `NVIDIA_API_KEY` is required. The rest have defaults.
+
+The function's `maxDuration` is 60s (`api/generate.js`). `NVIDIA_TOTAL_TIMEOUT_MS` caps moderation plus every model attempt so the API returns a JSON 504 before Vercel kills the function; it is clamped to stay under `maxDuration`. Keep `NVIDIA_TIMEOUT_MS` below it, and keep `NVIDIA_MODEL_ATTEMPTS=1` on Vercel — retries of a ~35s reasoning call don't fit in 60s.
 
 ## API
 

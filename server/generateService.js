@@ -10,6 +10,9 @@ const MODEL_ATTEMPTS = Number(process.env.NVIDIA_MODEL_ATTEMPTS || 1);
 // finish_reason:"length" — an empty response, not a model failure. Budget for reasoning.
 const MAX_OUTPUT_TOKENS = Number(process.env.NVIDIA_MAX_TOKENS || 4096);
 const MODERATION_MAX_TOKENS = Number(process.env.NVIDIA_MODERATION_MAX_TOKENS || 2048);
+// Don't start a model call with less time than this left in the request budget —
+// it would only be aborted mid-reasoning.
+const MIN_CALL_BUDGET_MS = 5000;
 
 const configuredModels = [
   process.env.NVIDIA_MODEL || 'openai/gpt-oss-20b',
@@ -33,10 +36,15 @@ export function assertApiKey() {
   }
 }
 
-export async function generateTweetsWithFallback(text) {
+// budgetMs caps the whole request (moderation + every model attempt). Serverless hosts
+// kill the function at their own limit and return a non-JSON page, so the caller passes
+// a budget below that limit and we return a JSON 504 ourselves instead.
+export async function generateTweetsWithFallback(text, { budgetMs } = {}) {
   assertApiKey();
 
-  const moderation = await classifyContentPolicy(text).catch((err) => {
+  const deadline = budgetMs ? Date.now() + budgetMs : Infinity;
+
+  const moderation = await classifyContentPolicy(text, deadline).catch((err) => {
     // The guardrail is best-effort infrastructure, not the product. If the moderation
     // call itself dies (dead model, timeout, quota) we must not block a legitimate
     // request — log it loudly and continue.
@@ -61,7 +69,7 @@ export async function generateTweetsWithFallback(text) {
       try {
         console.log(`[IdeaBird] Trying model: ${modelName} (attempt ${attempt}/${MODEL_ATTEMPTS})`);
 
-        const raw = await requestGenerationModel(text, modelName, attempt);
+        const raw = await requestGenerationModel(text, modelName, attempt, deadline);
         const result = buildTweetPipeline(raw, text);
 
         console.log(
@@ -74,6 +82,10 @@ export async function generateTweetsWithFallback(text) {
         console.error(`[IdeaBird] ${modelName} attempt ${attempt} failed: ${err.status || ''} ${err.message?.substring(0, 140)}`);
         lastError = err;
 
+        if (err.budgetExhausted) {
+          throw err;
+        }
+
         if (!shouldRetry(err) && attempt === 1) {
           break;
         }
@@ -84,10 +96,11 @@ export async function generateTweetsWithFallback(text) {
   throw lastError;
 }
 
-export async function classifyContentPolicy(text) {
+export async function classifyContentPolicy(text, deadline = Infinity) {
   const modelName = MODEL_CANDIDATES[0];
   const raw = await requestChatCompletion({
     modelName,
+    deadline,
     messages: [
       {
         role: 'system',
@@ -110,9 +123,10 @@ export async function classifyContentPolicy(text) {
   };
 }
 
-async function requestGenerationModel(text, modelName, attempt) {
+async function requestGenerationModel(text, modelName, attempt, deadline) {
   return requestChatCompletion({
     modelName,
+    deadline,
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: buildUserMessage(text) },
@@ -122,9 +136,15 @@ async function requestGenerationModel(text, modelName, attempt) {
   });
 }
 
-async function requestChatCompletion({ modelName, messages, temperature, maxTokens }) {
+async function requestChatCompletion({ modelName, messages, temperature, maxTokens, deadline = Infinity }) {
+  const remainingMs = deadline - Date.now();
+  if (remainingMs < MIN_CALL_BUDGET_MS) {
+    throw budgetExhaustedError();
+  }
+
+  const timeoutMs = Math.min(REQUEST_TIMEOUT_MS, remainingMs);
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetch(`${NVIDIA_BASE_URL}/chat/completions`, {
@@ -171,6 +191,10 @@ async function requestChatCompletion({ modelName, messages, temperature, maxToke
     return raw;
   } catch (err) {
     if (err.name === 'AbortError') {
+      if (timeoutMs < REQUEST_TIMEOUT_MS) {
+        throw budgetExhaustedError();
+      }
+
       const timeoutError = new Error('NVIDIA NIM timed out. Try again in a few seconds.');
       timeoutError.status = 504;
       timeoutError.retryable = true;
@@ -181,6 +205,13 @@ async function requestChatCompletion({ modelName, messages, temperature, maxToke
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function budgetExhaustedError() {
+  const error = new Error('Generation took too long and was stopped before the server time limit. Try again, or use a shorter excerpt.');
+  error.status = 504;
+  error.budgetExhausted = true;
+  return error;
 }
 
 function shouldRetry(err) {
