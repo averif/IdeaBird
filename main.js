@@ -1,4 +1,7 @@
 import Tesseract from 'tesseract.js';
+import { inject } from '@vercel/analytics';
+
+inject();
 
 // --- DOM Refs ---
 const stepUpload = document.getElementById('step-upload');
