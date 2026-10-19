@@ -1,4 +1,15 @@
-import { generateTweetsWithFallback } from '../server/generateService.js';
+import type { IncomingMessage, ServerResponse } from 'node:http';
+import { generateTweetsWithFallback, type GenerateError } from '../server/generateService.js';
+
+// Minimal shape of the request/response helpers Vercel's Node runtime adds.
+interface VercelRequest extends IncomingMessage {
+  body?: unknown;
+}
+
+interface VercelResponse extends ServerResponse {
+  status(code: number): VercelResponse;
+  json(body: unknown): VercelResponse;
+}
 
 // 60s is the highest limit every Vercel plan allows. Reasoning models need ~30-40s for
 // moderation + generation, so the old 30s limit killed requests and Vercel answered
@@ -12,7 +23,7 @@ export const config = {
 // Stop NVIDIA work before Vercel kills the function (60s), so the client gets a JSON 504.
 const GENERATION_BUDGET_MS = Math.min(Number(process.env.NVIDIA_TOTAL_TIMEOUT_MS || 55000), 57000);
 
-export default async function handler(req, res) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Method not allowed.' });
@@ -26,7 +37,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid JSON request body.' });
     }
   }
-  const { text } = body;
+  const { text } = body as { text?: unknown };
 
   if (!text || typeof text !== 'string' || text.trim().length === 0) {
     return res.status(400).json({ error: 'No text provided. Extract text from a screenshot first.' });
@@ -49,11 +60,11 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ status: 'ok', tweets: result.tweets, model: result.model });
   } catch (err) {
-    return sendGenerateError(res, err);
+    return sendGenerateError(res, err as GenerateError);
   }
 }
 
-function sendGenerateError(res, err) {
+function sendGenerateError(res: VercelResponse, err: GenerateError) {
   console.error('Generate error:', err.message || err);
 
   const status = err.status || err.httpCode;

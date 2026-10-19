@@ -1,7 +1,7 @@
 import 'dotenv/config';
-import express from 'express';
+import express, { type Request, type Response } from 'express';
 import cors from 'cors';
-import { assertApiKey, generateTweetsWithFallback, NIM_CONFIG } from './generateService.js';
+import { assertApiKey, generateTweetsWithFallback, NIM_CONFIG, type GenerateError } from './generateService.js';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -17,8 +17,8 @@ try {
   process.exit(1);
 }
 
-app.post('/api/generate', async (req, res) => {
-  const { text } = req.body;
+app.post('/api/generate', async (req: Request<unknown, unknown, { text?: unknown }>, res: Response) => {
+  const { text } = req.body ?? {};
 
   if (!text || typeof text !== 'string' || text.trim().length === 0) {
     return res.status(400).json({ error: 'No text provided. Extract text from a screenshot first.' });
@@ -41,11 +41,11 @@ app.post('/api/generate', async (req, res) => {
 
     return res.json({ status: 'ok', tweets: result.tweets, model: result.model });
   } catch (err) {
-    return sendGenerateError(res, err);
+    return sendGenerateError(res, err as GenerateError);
   }
 });
 
-function sendGenerateError(res, err) {
+function sendGenerateError(res: Response, err: GenerateError) {
   console.error('Generate error:', err.message || err);
 
   const status = err.status || err.httpCode;

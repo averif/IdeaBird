@@ -4,7 +4,9 @@ export const STYLE_LANES = [
   'Stat-Lead Tweet',
   'Thread',
   'LinkedIn Version',
-];
+] as const;
+
+export type StyleLane = (typeof STYLE_LANES)[number];
 
 export const SYSTEM_PROMPT = `You are an elite internet writer, content strategist, and viral social media expert.
 
@@ -117,7 +119,7 @@ Each object has:
 - "style": one of "Hot Take Tweet", "Question Tweet", "Stat-Lead Tweet", "Thread", "LinkedIn Version"
 - "tweet": the finished post-ready content`;
 
-export function buildUserMessage(extractedText) {
+export function buildUserMessage(extractedText: string): string {
   return `Ignore OCR artifacts. Do not summarize mechanically.
 Analyze the source deeply, infer missing context carefully, then generate the 5 requested post-ready outputs.
 

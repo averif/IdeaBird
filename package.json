@@ -4,10 +4,11 @@
   "description": "IdeaBird turns screenshot text into high-signal social content with NVIDIA NIM.",
   "type": "module",
   "scripts": {
-    "dev": "concurrently --kill-others-on-fail \"node --watch server/index.js\" \"vite\"",
-    "dev:server": "node server/index.js",
+    "dev": "concurrently --kill-others-on-fail \"tsx watch server/index.ts\" \"vite\"",
+    "dev:server": "tsx server/index.ts",
     "dev:client": "vite",
-    "build": "vite build",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.app.json",
+    "build": "npm run typecheck && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -15,10 +16,20 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^5.1.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
     "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.5",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.7.0",
     "concurrently": "^9.2.4",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
     "vite": "^6.3.4"
   }
 }

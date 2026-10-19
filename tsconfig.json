@@ -1,0 +1,18 @@
+{
+  // Server code: Express dev API (server/) and the Vercel function (api/).
+  // The React client has its own config in tsconfig.app.json.
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "types": ["node"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true
+  },
+  "include": ["server", "api"]
+}

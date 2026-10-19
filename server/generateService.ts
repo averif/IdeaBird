@@ -1,5 +1,45 @@
 import { SYSTEM_PROMPT, buildUserMessage } from './prompt.js';
-import { buildTweetPipeline } from './tweetPipeline.js';
+import { buildTweetPipeline, type Tweet } from './tweetPipeline.js';
+
+// Errors carry HTTP-ish metadata so routes can map them to responses and the
+// fallback loop can decide whether to retry.
+export interface GenerateError extends Error {
+  status?: number;
+  httpCode?: number;
+  retryable?: boolean;
+  emptyResponse?: boolean;
+  budgetExhausted?: boolean;
+}
+
+interface ChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+interface ChatCompletionPayload {
+  choices?: { message?: { content?: string | null }; finish_reason?: string }[];
+  error?: { message?: string };
+  detail?: string;
+}
+
+interface ModerationResult {
+  blocked: boolean;
+  answer: string;
+  error?: string;
+}
+
+export type GenerateResult =
+  | { status: 'policy_block'; tweets: []; moderation: ModerationResult }
+  | {
+      status: 'ok';
+      tweets: Tweet[];
+      diagnostics: ReturnType<typeof buildTweetPipeline>['diagnostics'];
+      model: string;
+    };
+
+function createError(message: string, props: Partial<GenerateError> = {}): GenerateError {
+  return Object.assign(new Error(message), props);
+}
 
 const NVIDIA_BASE_URL = (process.env.NVIDIA_BASE_URL || 'https://integrate.api.nvidia.com/v1').replace(/\/+$/, '');
 const API_KEY = process.env.NVIDIA_API_KEY || process.env.NIM_API_KEY || process.env.GEMINI_API_KEY;
@@ -28,23 +68,24 @@ export const NIM_CONFIG = {
   modelCandidates: MODEL_CANDIDATES,
 };
 
-export function assertApiKey() {
+export function assertApiKey(): void {
   if (!API_KEY) {
-    const error = new Error('NVIDIA_API_KEY is missing. Add it to your environment variables.');
-    error.status = 401;
-    throw error;
+    throw createError('NVIDIA_API_KEY is missing. Add it to your environment variables.', { status: 401 });
   }
 }
 
 // budgetMs caps the whole request (moderation + every model attempt). Serverless hosts
 // kill the function at their own limit and return a non-JSON page, so the caller passes
 // a budget below that limit and we return a JSON 504 ourselves instead.
-export async function generateTweetsWithFallback(text, { budgetMs } = {}) {
+export async function generateTweetsWithFallback(
+  text: string,
+  { budgetMs }: { budgetMs?: number } = {}
+): Promise<GenerateResult> {
   assertApiKey();
 
   const deadline = budgetMs ? Date.now() + budgetMs : Infinity;
 
-  const moderation = await classifyContentPolicy(text, deadline).catch((err) => {
+  const moderation = await classifyContentPolicy(text, deadline).catch((err: GenerateError): ModerationResult => {
     // The guardrail is best-effort infrastructure, not the product. If the moderation
     // call itself dies (dead model, timeout, quota) we must not block a legitimate
     // request — log it loudly and continue.
@@ -62,7 +103,7 @@ export async function generateTweetsWithFallback(text, { budgetMs } = {}) {
     };
   }
 
-  let lastError = null;
+  let lastError: GenerateError | null = null;
 
   for (const modelName of MODEL_CANDIDATES) {
     for (let attempt = 1; attempt <= MODEL_ATTEMPTS; attempt += 1) {
@@ -78,7 +119,8 @@ export async function generateTweetsWithFallback(text, { budgetMs } = {}) {
         console.log(`[IdeaBird] Success with ${modelName}`);
 
         return { status: 'ok', ...result, model: modelName };
-      } catch (err) {
+      } catch (caught) {
+        const err = caught as GenerateError;
         console.error(`[IdeaBird] ${modelName} attempt ${attempt} failed: ${err.status || ''} ${err.message?.substring(0, 140)}`);
         lastError = err;
 
@@ -96,7 +138,7 @@ export async function generateTweetsWithFallback(text, { budgetMs } = {}) {
   throw lastError;
 }
 
-export async function classifyContentPolicy(text, deadline = Infinity) {
+export async function classifyContentPolicy(text: string, deadline = Infinity): Promise<ModerationResult> {
   const modelName = MODEL_CANDIDATES[0];
   const raw = await requestChatCompletion({
     modelName,
@@ -123,7 +165,7 @@ export async function classifyContentPolicy(text, deadline = Infinity) {
   };
 }
 
-async function requestGenerationModel(text, modelName, attempt, deadline) {
+async function requestGenerationModel(text: string, modelName: string, attempt: number, deadline: number): Promise<string> {
   return requestChatCompletion({
     modelName,
     deadline,
@@ -136,7 +178,19 @@ async function requestGenerationModel(text, modelName, attempt, deadline) {
   });
 }
 
-async function requestChatCompletion({ modelName, messages, temperature, maxTokens, deadline = Infinity }) {
+async function requestChatCompletion({
+  modelName,
+  messages,
+  temperature,
+  maxTokens,
+  deadline = Infinity,
+}: {
+  modelName: string;
+  messages: ChatMessage[];
+  temperature: number;
+  maxTokens: number;
+  deadline?: number;
+}): Promise<string> {
   const remainingMs = deadline - Date.now();
   if (remainingMs < MIN_CALL_BUDGET_MS) {
     throw budgetExhaustedError();
@@ -163,42 +217,35 @@ async function requestChatCompletion({ modelName, messages, temperature, maxToke
       }),
     });
 
-    const payload = await response.json().catch(() => ({}));
+    const payload = (await response.json().catch(() => ({}))) as ChatCompletionPayload;
     if (!response.ok) {
       const message = payload.error?.message || payload.detail || response.statusText || 'NVIDIA NIM request failed';
-      const error = new Error(message);
-      error.status = response.status;
-      throw error;
+      throw createError(message, { status: response.status });
     }
 
     const raw = payload.choices?.[0]?.message?.content;
     if (!raw || !raw.trim()) {
-      const choice = payload.choices?.[0] || {};
+      const choice = payload.choices?.[0] ?? {};
       const reason = choice.finish_reason || 'unknown';
       // A reasoning model that exhausted max_tokens on hidden reasoning returns
       // content:null with finish_reason:'length'. That is a token-budget problem,
       // not a dead model — say so, and never mark it non-retryable.
-      const error = new Error(
+      throw createError(
         reason === 'length'
           ? `NVIDIA NIM returned an empty response: the model spent its whole ${maxTokens}-token budget on reasoning and never wrote output. Raise NVIDIA_MAX_TOKENS.`
-          : `NVIDIA NIM returned an empty response (finish_reason: ${reason}).`
+          : `NVIDIA NIM returned an empty response (finish_reason: ${reason}).`,
+        { retryable: true, emptyResponse: true }
       );
-      error.retryable = true;
-      error.emptyResponse = true;
-      throw error;
     }
 
     return raw;
   } catch (err) {
-    if (err.name === 'AbortError') {
+    if (err instanceof Error && err.name === 'AbortError') {
       if (timeoutMs < REQUEST_TIMEOUT_MS) {
         throw budgetExhaustedError();
       }
 
-      const timeoutError = new Error('NVIDIA NIM timed out. Try again in a few seconds.');
-      timeoutError.status = 504;
-      timeoutError.retryable = true;
-      throw timeoutError;
+      throw createError('NVIDIA NIM timed out. Try again in a few seconds.', { status: 504, retryable: true });
     }
 
     throw err;
@@ -207,15 +254,15 @@ async function requestChatCompletion({ modelName, messages, temperature, maxToke
   }
 }
 
-function budgetExhaustedError() {
-  const error = new Error('Generation took too long and was stopped before the server time limit. Try again, or use a shorter excerpt.');
-  error.status = 504;
-  error.budgetExhausted = true;
-  return error;
+function budgetExhaustedError(): GenerateError {
+  return createError(
+    'Generation took too long and was stopped before the server time limit. Try again, or use a shorter excerpt.',
+    { status: 504, budgetExhausted: true }
+  );
 }
 
-function shouldRetry(err) {
+function shouldRetry(err: GenerateError): boolean {
   if (err.retryable) return true;
-  if ([408, 429, 500, 502, 503, 504].includes(err.status)) return true;
+  if (err.status && [408, 429, 500, 502, 503, 504].includes(err.status)) return true;
   return /parse|json|select|empty|network|fetch|terminated|timeout/i.test(err.message || '');
 }

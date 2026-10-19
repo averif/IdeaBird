@@ -12,15 +12,17 @@ Upload a screenshot, extract text via OCR, then generate **5 high-signal social 
 
 ## Tech Stack
 
-- **Client**: Vite + vanilla JS, `tesseract.js`
-- **Server**: Node.js ESM + Express, `dotenv`, NVIDIA NIM OpenAI-compatible HTTP API
+- **Client**: Vite + React + TypeScript, `tesseract.js`
+- **Server**: Node.js ESM + Express in TypeScript (run with `tsx`), `dotenv`, NVIDIA NIM OpenAI-compatible HTTP API
 
 ## Project Structure
 
-- `index.html`, `main.js`, `style.css`: frontend UI, OCR, results rendering
-- `server/index.js`: Express API (`POST /api/generate`)
-- `server/prompt.js`: system prompt and user prompt builder for the model
-- `server/tweetPipeline.js`: parses the model output, scores quality, removes weak/duplicate content, and selects the required 5 formats
+- `index.html`, `src/main.tsx`, `src/App.tsx`, `src/components/`, `src/style.css`: React frontend UI, OCR, results rendering
+- `src/api.ts`: client for `POST /api/generate` with friendly error messages
+- `server/index.ts`: Express API (`POST /api/generate`)
+- `server/generateService.ts`: moderation check, NVIDIA NIM calls, model fallback chain
+- `server/prompt.ts`: system prompt and user prompt builder for the model
+- `server/tweetPipeline.ts`: parses the model output, scores quality, removes weak/duplicate content, and selects the required 5 formats
 
 ## Setup
 
@@ -91,11 +93,13 @@ npm run build
 npm run preview
 ```
 
+`build` type-checks the client (`tsconfig.app.json`) and server (`tsconfig.json`) before bundling. Run `npm run typecheck` on its own to check types only.
+
 `preview` serves the built frontend only. For local generation, run `npm run dev` so the Express API runs too.
 
 ## Vercel Deployment
 
-This project includes a serverless API route at `api/generate.js`, so the deployed frontend can call `/api/generate` on the same Vercel domain.
+This project includes a serverless API route at `api/generate.ts`, so the deployed frontend can call `/api/generate` on the same Vercel domain.
 
 In Vercel, add these Environment Variables before redeploying:
 
@@ -112,7 +116,7 @@ NVIDIA_TOTAL_TIMEOUT_MS=55000
 
 Only `NVIDIA_API_KEY` is required. The rest have defaults.
 
-The function's `maxDuration` is 60s (`api/generate.js`). `NVIDIA_TOTAL_TIMEOUT_MS` caps moderation plus every model attempt so the API returns a JSON 504 before Vercel kills the function; it is clamped to stay under `maxDuration`. Keep `NVIDIA_TIMEOUT_MS` below it, and keep `NVIDIA_MODEL_ATTEMPTS=1` on Vercel — retries of a ~35s reasoning call don't fit in 60s.
+The function's `maxDuration` is 60s (`api/generate.ts`). `NVIDIA_TOTAL_TIMEOUT_MS` caps moderation plus every model attempt so the API returns a JSON 504 before Vercel kills the function; it is clamped to stay under `maxDuration`. Keep `NVIDIA_TIMEOUT_MS` below it, and keep `NVIDIA_MODEL_ATTEMPTS=1` on Vercel — retries of a ~35s reasoning call don't fit in 60s.
 
 ## API
 

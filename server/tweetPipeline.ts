@@ -1,4 +1,29 @@
-import { STYLE_LANES } from './prompt.js';
+import { STYLE_LANES, type StyleLane } from './prompt.js';
+
+export interface Tweet {
+  style: StyleLane;
+  tweet: string;
+}
+
+interface SourceInsights {
+  hasSource: boolean;
+  entities: string[];
+  dates: string[];
+  numbers: string[];
+  concreteTerms: string[];
+}
+
+export type TweetEvaluation = ReturnType<typeof evaluateTweet>;
+
+interface RankedTweet extends Tweet {
+  index: number;
+  evaluation: TweetEvaluation;
+}
+
+interface RawCandidate {
+  style?: unknown;
+  tweet?: unknown;
+}
 
 const CLICHE_PHRASES = [
   'game changer',
@@ -138,7 +163,7 @@ const NATURAL_OPENERS = [
   'the worst part',
 ];
 
-const STYLE_ALIASES = new Map([
+const STYLE_ALIASES = new Map<string, StyleLane>([
   ['hot take', 'Hot Take Tweet'],
   ['hot take tweet', 'Hot Take Tweet'],
   ['hot-take tweet', 'Hot Take Tweet'],
@@ -157,7 +182,7 @@ const STYLE_ALIASES = new Map([
   ['linkedin post', 'LinkedIn Version'],
 ]);
 
-export function buildTweetPipeline(rawModelOutput, sourceText = '') {
+export function buildTweetPipeline(rawModelOutput: string, sourceText = '') {
   const candidates = parseTweetCandidates(rawModelOutput);
   const sourceInsights = extractSourceInsights(sourceText);
   const ranked = rankTweetCandidatesInternal(candidates, { includeRejected: true, sourceInsights });
@@ -179,7 +204,7 @@ export function buildTweetPipeline(rawModelOutput, sourceText = '') {
   };
 }
 
-function fillToTarget(selected, rankedCandidates, targetCount) {
+function fillToTarget(selected: RankedTweet[], rankedCandidates: RankedTweet[], targetCount: number): RankedTweet[] {
   const output = [...selected];
 
   for (const candidate of rankedCandidates) {
@@ -192,7 +217,7 @@ function fillToTarget(selected, rankedCandidates, targetCount) {
   return output.slice(0, targetCount);
 }
 
-export function parseTweetCandidates(raw) {
+export function parseTweetCandidates(raw: string): Tweet[] {
   const parsed = parseJsonArray(raw);
   if (!Array.isArray(parsed)) {
     throw new Error('Expected an array of tweet candidates.');
@@ -200,14 +225,17 @@ export function parseTweetCandidates(raw) {
 
   return parsed
     .map(normalizeCandidate)
-    .filter((candidate) => candidate.style && candidate.tweet);
+    .filter((candidate): candidate is Tweet => Boolean(candidate.style && candidate.tweet));
 }
 
-export function rankTweetCandidates(candidates) {
+export function rankTweetCandidates(candidates: Tweet[]): RankedTweet[] {
   return rankTweetCandidatesInternal(candidates, { includeRejected: false, sourceInsights: extractSourceInsights('') });
 }
 
-function rankTweetCandidatesInternal(candidates, { includeRejected, sourceInsights }) {
+function rankTweetCandidatesInternal(
+  candidates: Tweet[],
+  { includeRejected, sourceInsights }: { includeRejected: boolean; sourceInsights: SourceInsights }
+): RankedTweet[] {
   return candidates
     .map((candidate, index) => {
       const evaluation = evaluateTweet(candidate, candidates, sourceInsights);
@@ -217,7 +245,11 @@ function rankTweetCandidatesInternal(candidates, { includeRejected, sourceInsigh
     .sort((a, b) => b.evaluation.total - a.evaluation.total);
 }
 
-export function evaluateTweet(candidate, allCandidates = [], sourceInsights = extractSourceInsights('')) {
+export function evaluateTweet(
+  candidate: Tweet,
+  allCandidates: Tweet[] = [],
+  sourceInsights: SourceInsights = extractSourceInsights('')
+) {
   const tweet = normalizeWhitespace(candidate.tweet);
   const lower = tweet.toLowerCase();
   const words = lower.match(/[a-z0-9']+/g) || [];
@@ -319,9 +351,9 @@ export function evaluateTweet(candidate, allCandidates = [], sourceInsights = ex
   };
 }
 
-export function selectDiverseTweets(rankedCandidates, targetCount = STYLE_LANES.length) {
-  const selected = [];
-  const usedStyles = new Set();
+export function selectDiverseTweets(rankedCandidates: RankedTweet[], targetCount: number = STYLE_LANES.length): RankedTweet[] {
+  const selected: RankedTweet[] = [];
+  const usedStyles = new Set<StyleLane>();
 
   for (const style of STYLE_LANES) {
     const match = rankedCandidates.find((candidate) =>
@@ -396,33 +428,34 @@ export function selectDiverseTweets(rankedCandidates, targetCount = STYLE_LANES.
     .sort((a, b) => STYLE_LANES.indexOf(a.style) - STYLE_LANES.indexOf(b.style));
 }
 
-function normalizeCandidate(candidate) {
+function normalizeCandidate(candidate: unknown): { style: StyleLane | null; tweet: string } {
   if (!candidate || typeof candidate !== 'object') {
     return { style: null, tweet: '' };
   }
 
+  const { style, tweet } = candidate as RawCandidate;
   return {
-    style: normalizeStyle(candidate.style),
-    tweet: normalizeWhitespace(String(candidate.tweet || '')),
+    style: normalizeStyle(style),
+    tweet: normalizeWhitespace(String(tweet || '')),
   };
 }
 
-function normalizeStyle(style) {
+function normalizeStyle(style: unknown): StyleLane | null {
   const normalized = normalizeWhitespace(String(style || '')).toLowerCase();
   return STYLE_ALIASES.get(normalized) || STYLE_LANES.find((lane) => lane.toLowerCase() === normalized) || null;
 }
 
-function isLongFormStyle(style) {
+function isLongFormStyle(style: StyleLane): boolean {
   return style === 'Thread' || style === 'LinkedIn Version';
 }
 
-function contentMaxLength(style) {
+function contentMaxLength(style: StyleLane): number {
   if (style === 'Thread') return 1800;
   if (style === 'LinkedIn Version') return 1400;
   return 280;
 }
 
-function hasNumberedFlow(value) {
+function hasNumberedFlow(value: string): boolean {
   const lines = normalizeWhitespace(value)
     .split(/\n|(?=\b\d+\.\s+)/)
     .map((line) => line.trim())
@@ -432,7 +465,7 @@ function hasNumberedFlow(value) {
   return numberedLines.length >= 5;
 }
 
-function extractSourceInsights(sourceText) {
+function extractSourceInsights(sourceText: string): SourceInsights {
   const source = normalizeWhitespace(String(sourceText || ''));
   const entities = extractEntities(source);
   const dates = extractDatesAndDeadlines(source);
@@ -447,8 +480,8 @@ function extractSourceInsights(sourceText) {
   };
 }
 
-function extractEntities(source) {
-  const entities = new Set();
+function extractEntities(source: string): string[] {
+  const entities = new Set<string>();
 
   for (const match of source.matchAll(/\b(?:[A-Z][a-zA-Z0-9&.'-]{2,})(?:\s+(?:[A-Z][a-zA-Z0-9&.'-]{2,}|of|and|the|for|to)){0,5}/g)) {
     const value = cleanSourceTerm(match[0]);
@@ -463,8 +496,8 @@ function extractEntities(source) {
   return [...entities].slice(0, 18);
 }
 
-function extractDatesAndDeadlines(source) {
-  const dates = new Set();
+function extractDatesAndDeadlines(source: string): string[] {
+  const dates = new Set<string>();
   const patterns = [
     /\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2}(?:,\s*\d{4})?\b/gi,
     /\b\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?(?:\s+\d{4})?\b/gi,
@@ -482,8 +515,8 @@ function extractDatesAndDeadlines(source) {
   return [...dates].slice(0, 12);
 }
 
-function extractNumbers(source) {
-  const numbers = new Set();
+function extractNumbers(source: string): string[] {
+  const numbers = new Set<string>();
 
   for (const match of source.matchAll(/\b\$?\d+(?:[.,]\d+)*(?:\s?(?:million|billion|trillion|k|m|bn|%|percent))?\b/gi)) {
     numbers.add(cleanSourceTerm(match[0]));
@@ -492,19 +525,19 @@ function extractNumbers(source) {
   return [...numbers].slice(0, 12);
 }
 
-function cleanSourceTerm(value) {
+function cleanSourceTerm(value: string): string {
   return normalizeWhitespace(value)
     .replace(/^[^a-zA-Z0-9$]+|[^a-zA-Z0-9.%]+$/g, '')
     .trim();
 }
 
-function isUsefulSourceTerm(value) {
+function isUsefulSourceTerm(value: string): boolean {
   if (!value || value.length < 3) return false;
   if (/^(The|This|That|And|But|For|With|From|Your|You|They|Their|There|Here|What|When|Where|Why|How|Raw Text)$/i.test(value)) return false;
   return true;
 }
 
-function sourceContextScore(tweet, sourceInsights) {
+function sourceContextScore(tweet: string, sourceInsights: SourceInsights): number {
   if (!sourceInsights.hasSource) return 0;
 
   const lowerTweet = tweet.toLowerCase();
@@ -516,7 +549,7 @@ function sourceContextScore(tweet, sourceInsights) {
   return Math.min(24, matchedConcrete * 5 + matchedEntities * 3 + matchedDates * 4 + matchedNumbers * 3);
 }
 
-function vagueRewritePenalty(tweet, lower, sourceInsights) {
+function vagueRewritePenalty(tweet: string, lower: string, sourceInsights: SourceInsights): number {
   let penalty = 0;
   const wordCount = (lower.match(/[a-z0-9']+/g) || []).length;
 
@@ -533,14 +566,14 @@ function vagueRewritePenalty(tweet, lower, sourceInsights) {
   return penalty;
 }
 
-function parseJsonArray(raw) {
+function parseJsonArray(raw: string): unknown {
   const candidates = [raw];
   const array = extractFirstJsonArray(raw);
   if (array && array !== raw) {
     candidates.push(array);
   }
 
-  let lastError = null;
+  let lastError: unknown = null;
   for (const candidate of candidates) {
     try {
       return JSON.parse(candidate);
@@ -563,8 +596,8 @@ function parseJsonArray(raw) {
   throw lastError || new Error('Could not parse tweet candidates from AI response.');
 }
 
-function parseMalformedCandidates(raw) {
-  const repaired = [];
+function parseMalformedCandidates(raw: string): RawCandidate[] {
+  const repaired: RawCandidate[] = [];
 
   for (const match of raw.matchAll(/\{\s*"style"\s*:\s*"((?:\\.|[^"\\])*)"\s*,\s*"tweet"\s*:\s*"((?:\\.|[^"\\])*)"\s*\}/g)) {
     repaired.push({ style: decodeJsonString(match[1]), tweet: decodeJsonString(match[2]) });
@@ -581,7 +614,7 @@ function parseMalformedCandidates(raw) {
   return repaired;
 }
 
-function decodeJsonString(value) {
+function decodeJsonString(value: string): string {
   try {
     return JSON.parse(`"${value}"`);
   } catch {
@@ -589,7 +622,7 @@ function decodeJsonString(value) {
   }
 }
 
-function extractFirstJsonArray(value) {
+function extractFirstJsonArray(value: string): string | null {
   const start = value.indexOf('[');
   if (start === -1) return null;
 
@@ -624,7 +657,7 @@ function extractFirstJsonArray(value) {
   return null;
 }
 
-function escapeControlCharsInJsonStrings(value) {
+function escapeControlCharsInJsonStrings(value: string): string {
   let output = '';
   let inString = false;
   let escaped = false;
@@ -663,24 +696,24 @@ function escapeControlCharsInJsonStrings(value) {
   return output;
 }
 
-function normalizeWhitespace(value) {
+function normalizeWhitespace(value: string): string {
   return value.replace(/\r\n/g, '\n').replace(/[ \t]+/g, ' ').trim();
 }
 
-function countMatches(value, phrases) {
+function countMatches(value: string, phrases: string[]): number {
   return phrases.reduce((count, phrase) => count + (value.includes(phrase) ? 1 : 0), 0);
 }
 
-function uniqueRatio(words) {
+function uniqueRatio(words: string[]): number {
   if (words.length === 0) return 0;
   return new Set(words).size / words.length;
 }
 
-function hasUnexpectedContrast(tweet) {
+function hasUnexpectedContrast(tweet: string): boolean {
   return /\bbut\b|\byet\b|\bexcept\b|\binstead\b|\bactually\b|\bpretend\b/i.test(tweet);
 }
 
-function looksLikeLinkedIn(lower) {
+function looksLikeLinkedIn(lower: string): boolean {
   return (
     lower.includes('excited to share') ||
     lower.includes('i am thrilled') ||
@@ -692,13 +725,13 @@ function looksLikeLinkedIn(lower) {
   );
 }
 
-function overExplains(tweet) {
+function overExplains(tweet: string): boolean {
   const commas = (tweet.match(/,/g) || []).length;
   const clauses = (tweet.match(/\bbecause\b|\bwhich\b|\btherefore\b|\bhowever\b|\bmoreover\b|\bin order to\b|\bultimately\b/gi) || []).length;
   return tweet.length > 230 || commas >= 4 || clauses >= 2 || hasSymmetricalStructure(tweet);
 }
 
-function controlledImperfectionScore(tweet, lower, words) {
+function controlledImperfectionScore(tweet: string, lower: string, words: string[]): number {
   let score = 0;
 
   if (startsNaturally(lower)) score += 6;
@@ -712,7 +745,7 @@ function controlledImperfectionScore(tweet, lower, words) {
   return Math.min(score, 18);
 }
 
-function overPolishedPenalty(tweet, lower) {
+function overPolishedPenalty(tweet: string, lower: string): number {
   let penalty = 0;
 
   penalty += countMatches(lower, ABSTRACT_WORDS) * 4;
@@ -727,11 +760,11 @@ function overPolishedPenalty(tweet, lower) {
   return penalty;
 }
 
-function startsNaturally(lower) {
+function startsNaturally(lower: string): boolean {
   return NATURAL_OPENERS.some((opener) => lower.startsWith(opener));
 }
 
-function hasSymmetricalStructure(tweet) {
+function hasSymmetricalStructure(tweet: string): boolean {
   return (
     /\bnot\b.{4,80}\bbut\b/i.test(tweet) ||
     /\bbetween\b.{4,80}\band\b/i.test(tweet) ||
@@ -740,7 +773,7 @@ function hasSymmetricalStructure(tweet) {
   );
 }
 
-function similarityPenalty(candidate, allCandidates) {
+function similarityPenalty(candidate: Tweet, allCandidates: Tweet[]): number {
   const normalized = tokenize(candidate.tweet);
   if (normalized.length === 0) return 0;
 
@@ -755,22 +788,22 @@ function similarityPenalty(candidate, allCandidates) {
   return 0;
 }
 
-function isDuplicate(a, b, threshold) {
+function isDuplicate(a: string, b: string, threshold: number): boolean {
   return normalizeForCompare(a) === normalizeForCompare(b) || jaccard(tokenize(a), tokenize(b)) > threshold;
 }
 
-function normalizeForCompare(value) {
+function normalizeForCompare(value: string): string {
   return String(value).toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
 }
 
-function tokenize(value) {
+function tokenize(value: string): string[] {
   const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'to', 'of', 'in', 'on', 'for', 'with', 'is', 'are', 'it', 'that']);
   return normalizeForCompare(value)
     .split(' ')
     .filter((word) => word && !stopWords.has(word));
 }
 
-function jaccard(a, b) {
+function jaccard(a: string[], b: string[]): number {
   const setA = new Set(a);
   const setB = new Set(b);
   if (setA.size === 0 || setB.size === 0) return 0;
@@ -783,6 +816,6 @@ function jaccard(a, b) {
   return intersection / (setA.size + setB.size - intersection);
 }
 
-function countEmoji(value) {
+function countEmoji(value: string): number {
   return (value.match(/\p{Extended_Pictographic}/gu) || []).length;
 }
