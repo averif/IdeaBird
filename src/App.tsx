@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Tesseract from 'tesseract.js';
-import { postGenerateRequest } from './api';
+import { AuthRequiredError, postGenerateRequest } from './api';
+import { useAuth } from './auth/AuthContext';
+import { AuthModal, type AuthMode } from './auth/AuthModal';
 import { Header } from './components/Header';
+import { HistoryStep } from './components/HistoryStep';
+import { UserMenu } from './components/UserMenu';
 import { UploadStep } from './components/UploadStep';
 import { ExtractStep, type OcrProgress } from './components/ExtractStep';
 import { ResultsStep } from './components/ResultsStep';
@@ -21,8 +25,13 @@ export default function App() {
   const [tweets, setTweets] = useState<Tweet[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const { toast, showToast } = useToast();
+  const auth = useAuth();
+  const [authModal, setAuthModal] = useState<{ mode: AuthMode; reason?: string } | null>(null);
+  const [resetToken, setResetToken] = useState<string | null>(null);
 
   const generatingRef = useRef(false);
+  // Set when Generate was clicked while logged out; generation resumes after login.
+  const pendingGenerateRef = useRef(false);
   // Bumped on every new upload / start over so a slow OCR job can't overwrite newer state.
   const ocrRunRef = useRef(0);
 
@@ -121,6 +130,12 @@ export default function App() {
     const source = text.trim();
     if (!source || generatingRef.current) return;
 
+    if (auth.status !== 'authenticated') {
+      pendingGenerateRef.current = true;
+      setAuthModal({ mode: 'signup', reason: 'Sign up or log in to generate posts. Your text stays right here.' });
+      return;
+    }
+
     generatingRef.current = true;
     setIsGenerating(true);
 
@@ -147,6 +162,11 @@ export default function App() {
       setTweets(data.tweets);
       goToStep('copy');
     } catch (err) {
+      if (err instanceof AuthRequiredError) {
+        pendingGenerateRef.current = true;
+        setAuthModal({ mode: 'login', reason: 'Your session ended. Log in again to generate.' });
+        return;
+      }
       console.error('Generate error:', err);
       const message = err instanceof Error && err.message ? err.message : 'Failed to generate content. Please try again.';
       showToast(message, 'error', 5000);
@@ -154,7 +174,55 @@ export default function App() {
       generatingRef.current = false;
       setIsGenerating(false);
     }
-  }, [text, goToStep, showToast]);
+  }, [text, auth.status, goToStep, showToast]);
+
+  // Resume a Generate click that was interrupted by the login prompt.
+  useEffect(() => {
+    if (auth.status === 'authenticated' && pendingGenerateRef.current && !authModal) {
+      pendingGenerateRef.current = false;
+      generateTweets();
+    }
+  }, [auth.status, authModal, generateTweets]);
+
+  // History is private: leave it as soon as the session ends.
+  useEffect(() => {
+    if (auth.status === 'anonymous' && step === 'history') goToStep('upload');
+  }, [auth.status, step, goToStep]);
+
+  // Email links land on /?verify=<token> or /?reset=<token>. Strip the token from
+  // the address bar (and so from history and Referer headers) right away.
+  const handledLinkRef = useRef(false);
+  useEffect(() => {
+    if (handledLinkRef.current) return;
+    handledLinkRef.current = true;
+
+    const params = new URLSearchParams(window.location.search);
+    const verify = params.get('verify');
+    const reset = params.get('reset');
+    if (!verify && !reset) return;
+    window.history.replaceState(null, '', window.location.pathname);
+
+    if (reset) {
+      setResetToken(reset);
+      setAuthModal({ mode: 'reset' });
+    } else if (verify) {
+      auth
+        .verifyEmail(verify)
+        .then(() => showToast('Email verified. Thanks!', 'success'))
+        .catch((err: Error) => showToast(err.message, 'error', 5000));
+    }
+  }, [auth, showToast]);
+
+  const closeAuthModal = useCallback(() => {
+    pendingGenerateRef.current = false;
+    setAuthModal(null);
+  }, []);
+
+  const onAuthenticated = useCallback(() => {
+    setAuthModal(null);
+    setResetToken(null);
+    if (!pendingGenerateRef.current) showToast('You are logged in.', 'success');
+  }, [showToast]);
 
   // --- Button Handlers ---
   const startOver = () => {
@@ -174,7 +242,14 @@ export default function App() {
 
   return (
     <div className="app">
-      <Header step={step} />
+      <Header step={step}>
+        <UserMenu
+          onLogin={() => setAuthModal({ mode: 'login' })}
+          onSignup={() => setAuthModal({ mode: 'signup' })}
+          onHistory={() => goToStep('history')}
+          showToast={showToast}
+        />
+      </Header>
 
       <main className="main" id="main">
         <UploadStep active={step === 'upload'} onFile={handleFile} />
@@ -196,9 +271,22 @@ export default function App() {
           onStartOver={startOver}
           showToast={showToast}
         />
+        {auth.status === 'authenticated' && (
+          <HistoryStep active={step === 'history'} onNew={startOver} showToast={showToast} />
+        )}
         <GeneratingOverlay active={isGenerating} />
         <Toast toast={toast} />
       </main>
+      {authModal && (
+        <AuthModal
+          mode={authModal.mode}
+          reason={authModal.reason}
+          resetToken={resetToken}
+          onModeChange={(mode) => setAuthModal((current) => ({ ...current, mode }))}
+          onClose={closeAuthModal}
+          onAuthenticated={onAuthenticated}
+        />
+      )}
       <footer className="footer">
         <a href="/terms.html" target="_blank" rel="noreferrer">Terms</a>
       </footer>

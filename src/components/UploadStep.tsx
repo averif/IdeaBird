@@ -40,7 +40,10 @@ export function UploadStep({ active, onFile }: UploadStepProps) {
       <div className="workspace">
         <div className="workspace-copy">
           <span className="eyebrow">Screenshot to posts</span>
-          <h1>Turn screenshots into publish-ready posts.</h1>
+          <h1>
+            Turn screenshots into
+            <span className="muted">publish-ready posts.</span>
+          </h1>
           <p className="step-desc">Minimal OCR-to-post studio for quick, human-sounding output.</p>
         </div>
 

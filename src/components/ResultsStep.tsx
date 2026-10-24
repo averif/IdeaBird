@@ -64,14 +64,14 @@ export function ResultsStep({ active, tweets, isGenerating, onRegenerate, onStar
   );
 }
 
-interface TweetCardProps {
+export interface TweetCardProps {
   tweet: Tweet;
   index: number;
   copied: boolean;
   onCopy: () => void;
 }
 
-function TweetCard({ tweet: t, index, copied, onCopy }: TweetCardProps) {
+export function TweetCard({ tweet: t, index, copied, onCopy }: TweetCardProps) {
   const len = t.tweet.length;
   const maxLength = getContentMaxLength(t.style);
   const countLabel = maxLength === 280 ? `${len}/280` : `${len} chars`;

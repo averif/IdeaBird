@@ -1,3 +1,4 @@
+import { apiFetch } from './auth/client';
 import type { GenerateResponse } from './types';
 
 function isLocalHost(): boolean {
@@ -35,43 +36,25 @@ async function readApiJson(res: Response): Promise<GenerateResponse> {
   }
 }
 
+/** Thrown when the user must (re)authenticate before generating. */
+export class AuthRequiredError extends Error {
+  constructor() {
+    super('Log in to generate posts.');
+  }
+}
+
 export async function postGenerateRequest(text: string): Promise<{ res: Response; data: GenerateResponse }> {
-  const urls = ['/api/generate'];
-  const local = isLocalHost();
-
-  if (local && window.location.port !== '3001') {
-    urls.push('http://localhost:3001/api/generate');
-  }
-
-  const failures: Error[] = [];
-
-  for (const url of urls) {
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
-      });
-
-      const data = await readApiJson(res);
-      return { res, data };
-    } catch (err) {
-      failures.push(err instanceof Error ? err : new Error(String(err)));
-    }
-  }
-
-  const networkFailure = failures.find((err) =>
-    err instanceof TypeError ||
-    /failed to fetch|networkerror|load failed/i.test(err.message || '')
-  );
-
-  if (networkFailure) {
+  let res: Response;
+  try {
+    res = await apiFetch('/api/generate', { method: 'POST', body: JSON.stringify({ text }) });
+  } catch {
     throw new Error(
-      local
+      isLocalHost()
         ? 'IdeaBird backend is not running. Start the full app with npm run dev, then try Generate again.'
         : 'IdeaBird API is not reachable. Check the Vercel deployment and environment variables.'
     );
   }
 
-  throw failures[failures.length - 1] || new Error('Failed to generate content.');
+  if (res.status === 401) throw new AuthRequiredError();
+  return { res, data: await readApiJson(res) };
 }

@@ -1,6 +1,7 @@
+import type { ReactNode } from 'react';
 import type { Step } from '../types';
 
-export function Header({ step }: { step: Step }) {
+export function Header({ step, children }: { step: Step; children?: ReactNode }) {
   return (
     <header className="header" id="header">
       <div className="header-inner">
@@ -15,6 +16,7 @@ export function Header({ step }: { step: Step }) {
           <span data-step-label="edit">02 Edit</span>
           <span data-step-label="copy">03 Copy</span>
         </div>
+        {children}
       </div>
     </header>
   );
