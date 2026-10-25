@@ -12,9 +12,12 @@ export interface GenerateError extends Error {
   budgetExhausted?: boolean;
 }
 
-interface ChatMessage {
+/** OpenAI-style message content: plain text, or text + images for vision models. */
+export type ContentPart = { type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } };
+
+export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
-  content: string;
+  content: string | ContentPart[];
 }
 
 interface ChatCompletionPayload {
@@ -23,22 +26,14 @@ interface ChatCompletionPayload {
   detail?: string;
 }
 
-interface ModerationResult {
-  blocked: boolean;
-  answer: string;
-  error?: string;
+export interface GenerateResult {
+  status: 'ok';
+  tweets: Tweet[];
+  diagnostics: ReturnType<typeof buildTweetPipeline>['diagnostics'];
+  model: string;
 }
 
-export type GenerateResult =
-  | { status: 'policy_block'; tweets: []; moderation: ModerationResult }
-  | {
-      status: 'ok';
-      tweets: Tweet[];
-      diagnostics: ReturnType<typeof buildTweetPipeline>['diagnostics'];
-      model: string;
-    };
-
-function createError(message: string, props: Partial<GenerateError> = {}): GenerateError {
+export function createError(message: string, props: Partial<GenerateError> = {}): GenerateError {
   return Object.assign(new Error(message), props);
 }
 
@@ -48,32 +43,36 @@ const API_KEY = process.env.NVIDIA_API_KEY || process.env.NIM_API_KEY || process
 // so moving on to the next fallback model beats waiting it out.
 const REQUEST_TIMEOUT_MS = Number(process.env.NVIDIA_TIMEOUT_MS || 60000);
 const MODEL_ATTEMPTS = Number(process.env.NVIDIA_MODEL_ATTEMPTS || 1);
-// Moderation runs alongside generation. Once the posts are ready, wait at most this
-// long for its verdict before treating the check as unavailable.
-const MODERATION_GRACE_MS = Number(process.env.NVIDIA_MODERATION_GRACE_MS || 3000);
 // How hard reasoning models think before answering. Short posts don't need deep
 // reasoning, and reasoning tokens are most of the wait. Set to "" to not send it.
 const REASONING_EFFORT = process.env.NVIDIA_REASONING_EFFORT ?? 'low';
 // Models known to accept the OpenAI-style `reasoning_effort` parameter.
 const SUPPORTS_REASONING_EFFORT = /gpt-oss/i;
-// Reasoning models (gpt-oss, nemotron *-reasoning, deepseek, kimi) spend max_tokens on
-// hidden reasoning BEFORE emitting `content`. A small budget yields content:null with
+// Nemotron models can switch hidden reasoning off via the chat template. For
+// writing posts that cut generation time sharply and stopped answers from being
+// cut off mid-JSON. Set NVIDIA_WRITER_THINKING=on to keep reasoning.
+const SUPPORTS_THINKING_TOGGLE = /nemotron/i;
+export const WRITER_THINKING = (process.env.NVIDIA_WRITER_THINKING || 'off').toLowerCase() !== 'off';
+// Reasoning models (gpt-oss, nemotron, deepseek, kimi) spend max_tokens on hidden
+// reasoning BEFORE emitting `content`. A small budget yields content:null with
 // finish_reason:"length" — an empty response, not a model failure. Budget for reasoning.
 const MAX_OUTPUT_TOKENS = Number(process.env.NVIDIA_MAX_TOKENS || 4096);
-const MODERATION_MAX_TOKENS = Number(process.env.NVIDIA_MODERATION_MAX_TOKENS || 2048);
 // Don't start a model call with less time than this left in the request budget —
 // it would only be aborted mid-reasoning.
 const MIN_CALL_BUDGET_MS = 5000;
 
-const configuredModels = [
-  process.env.NVIDIA_MODEL || 'openai/gpt-oss-20b',
-  ...(process.env.NVIDIA_FALLBACK_MODELS || '')
-    .split(',')
-    .map((model) => model.trim())
-    .filter(Boolean),
-];
+export function modelList(primary: string | undefined, fallbacks: string | undefined, defaultModel: string): string[] {
+  const models = [primary || defaultModel, ...(fallbacks || '').split(',').map((model) => model.trim()).filter(Boolean)];
+  return [...new Set(models)];
+}
 
-export const MODEL_CANDIDATES = [...new Set(configuredModels)];
+// Writes the posts. Nemotron 3.5 Super VL answered in ~3s in testing, versus 48s+
+// for gpt-oss-20b on the same key.
+export const MODEL_CANDIDATES = modelList(
+  process.env.NVIDIA_MODEL,
+  process.env.NVIDIA_FALLBACK_MODELS,
+  'nvidia/nemotron-3.5-super-vl-120b-a12b'
+);
 export const NIM_CONFIG = {
   baseUrl: NVIDIA_BASE_URL,
   modelCandidates: MODEL_CANDIDATES,
@@ -85,182 +84,93 @@ export function assertApiKey(): void {
   }
 }
 
-// budgetMs caps the whole request (moderation + every model attempt). Serverless hosts
-// kill the function at their own limit and return a non-JSON page, so the caller passes
-// a budget below that limit and we return a JSON 504 ourselves instead.
-export async function generateTweetsWithFallback(
-  text: string,
-  { budgetMs }: { budgetMs?: number } = {}
-): Promise<GenerateResult> {
-  assertApiKey();
-
-  const deadline = budgetMs ? Date.now() + budgetMs : Infinity;
-  // Lets a "blocked" moderation verdict cancel generation that's still running.
-  const generationAbort = new AbortController();
-
-  // Moderation and generation run in parallel instead of back to back, so the
-  // user waits for one model call instead of two.
-  let moderationSettled = false;
-  const moderationPromise = classifyContentPolicy(text, deadline)
-    .catch((err: GenerateError): ModerationResult => {
-      // The guardrail is best-effort infrastructure, not the product. If the moderation
-      // call itself dies (dead model, timeout, quota) we must not block a legitimate
-      // request — log it loudly and continue.
-      console.error(
-        `[IdeaBird] Moderation check unavailable (${err.status || ''} ${err.message?.substring(0, 120)}) — continuing without it.`
-      );
-      return { blocked: false, answer: 'unavailable', error: err.message };
-    })
-    .then((result) => {
-      moderationSettled = true;
-      if (result.blocked) generationAbort.abort();
-      return result;
-    });
-
-  const generationPromise = generateWithFallback(text, deadline, generationAbort.signal);
-  // Don't surface a generation error (e.g. "cancelled") before moderation has spoken.
-  generationPromise.catch(() => {});
-
-  const first = await Promise.race([
-    moderationPromise.then((moderation) => ({ kind: 'moderation' as const, moderation })),
-    generationPromise.then(
-      (result) => ({ kind: 'generation' as const, result }),
-      (error: GenerateError) => ({ kind: 'generation-error' as const, error })
-    ),
-  ]);
-
-  let moderation: ModerationResult;
-  if (first.kind === 'moderation') {
-    moderation = first.moderation;
-  } else if (first.kind === 'generation-error') {
-    // Generation failed outright; a block verdict would still be the better message.
-    moderation = await moderationPromise;
-    if (!moderation.blocked) throw first.error;
-  } else {
-    // Posts are ready. Give moderation a short grace period, then move on.
-    const timedOut: ModerationResult = { blocked: false, answer: 'unavailable', error: 'slower than generation' };
-    let graceTimer: ReturnType<typeof setTimeout> | undefined;
-    moderation = await Promise.race([
-      moderationPromise,
-      new Promise<ModerationResult>((resolve) => {
-        graceTimer = setTimeout(() => resolve(timedOut), MODERATION_GRACE_MS);
-      }),
-    ]);
-    clearTimeout(graceTimer);
-    if (!moderationSettled) {
-      console.error('[IdeaBird] Moderation check unavailable (slower than generation) — continuing without it.');
-    }
-  }
-
-  if (moderation.blocked) {
-    console.log('[IdeaBird] Policy block: misinformation amplification risk');
-    return {
-      status: 'policy_block',
-      tweets: [],
-      moderation,
-    };
-  }
-
-  return generationPromise;
+/** A budget (ms) for the whole request becomes an absolute deadline. */
+export function deadlineFrom(budgetMs?: number): number {
+  return budgetMs ? Date.now() + budgetMs : Infinity;
 }
 
-async function generateWithFallback(text: string, deadline: number, signal: AbortSignal): Promise<GenerateResult> {
+/**
+ * Runs `call` against each model in order until one succeeds. Timeouts skip
+ * straight to the next model (retrying a queued model just waits again).
+ */
+export async function withModelFallback<T>(
+  models: string[],
+  label: string,
+  call: (modelName: string, attempt: number) => Promise<T>
+): Promise<{ value: T; model: string }> {
   let lastError: GenerateError | null = null;
 
-  for (const modelName of MODEL_CANDIDATES) {
+  for (const modelName of models) {
     for (let attempt = 1; attempt <= MODEL_ATTEMPTS; attempt += 1) {
-      if (signal.aborted) throw createError('Generation cancelled by the content policy check.');
-
       try {
-        console.log(`[IdeaBird] Trying model: ${modelName} (attempt ${attempt}/${MODEL_ATTEMPTS})`);
-
+        console.log(`[IdeaBird] ${label}: trying ${modelName} (attempt ${attempt}/${MODEL_ATTEMPTS})`);
         const startedAt = Date.now();
-        const raw = await requestGenerationModel(text, modelName, attempt, deadline, signal);
-        const result = buildTweetPipeline(raw, text);
-
-        console.log(
-          `[IdeaBird] Pipeline: ${result.diagnostics.generated} generated, ${result.diagnostics.ranked} ranked, ${result.diagnostics.selected} selected`
-        );
-        console.log(`[IdeaBird] Success with ${modelName} in ${Date.now() - startedAt}ms`);
-
-        return { status: 'ok', ...result, model: modelName };
+        const value = await call(modelName, attempt);
+        console.log(`[IdeaBird] ${label}: success with ${modelName} in ${Date.now() - startedAt}ms`);
+        return { value, model: modelName };
       } catch (caught) {
         const err = caught as GenerateError;
-        console.error(`[IdeaBird] ${modelName} attempt ${attempt} failed: ${err.status || ''} ${err.message?.substring(0, 140)}`);
+        console.error(`[IdeaBird] ${label}: ${modelName} attempt ${attempt} failed: ${err.status || ''} ${err.message?.substring(0, 140)}`);
         // Keep the most useful error for the user: "the model is slow" beats a later
         // fallback's "model not available for this key".
         if (!lastError?.timedOut || err.timedOut) lastError = err;
 
-        if (err.budgetExhausted || signal.aborted) {
-          throw err;
-        }
-
-        // A timeout means the model is slow or queued; retrying it would just wait
-        // again, so go straight to the next model.
-        if (err.timedOut || (!shouldRetry(err) && attempt === 1)) {
-          break;
-        }
+        if (err.budgetExhausted) throw err;
+        if (err.timedOut || (!shouldRetry(err) && attempt === 1)) break;
       }
     }
   }
 
-  throw lastError;
+  throw lastError ?? createError(`${label} failed: no models configured.`);
 }
 
-export async function classifyContentPolicy(text: string, deadline = Infinity): Promise<ModerationResult> {
-  const modelName = MODEL_CANDIDATES[0];
-  const raw = await requestChatCompletion({
-    modelName,
-    deadline,
-    messages: [
-      {
-        role: 'system',
-        content:
-          'Does this screenshot contain unverified allegations presented as fact, conspiracy claims, or content designed to spread misinformation? Answer with exactly one word: yes or no. Do not explain.',
-      },
-      {
-        role: 'user',
-        content: `Screenshot OCR text:\n---\n${text}\n---`,
-      },
-    ],
-    temperature: 0,
-    maxTokens: MODERATION_MAX_TOKENS,
+export interface GenerationSource {
+  /** Structured understanding of the screenshot, rendered for the writer model. */
+  insightBrief: string;
+  /** Plain-text facts used to score how concrete each post is. */
+  sourceText: string;
+}
+
+// budgetMs caps the whole request (every model attempt). Serverless hosts kill the
+// function at their own limit and return a non-JSON page, so the caller passes a
+// budget below that limit and we return a JSON 504 ourselves instead.
+export async function generateTweetsWithFallback(
+  source: GenerationSource,
+  { budgetMs }: { budgetMs?: number } = {}
+): Promise<GenerateResult> {
+  assertApiKey();
+  const deadline = deadlineFrom(budgetMs);
+
+  const { value, model } = await withModelFallback(MODEL_CANDIDATES, 'Generate', async (modelName, attempt) => {
+    const raw = await requestChatCompletion({
+      modelName,
+      deadline,
+      thinking: WRITER_THINKING,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: buildUserMessage(source.insightBrief) },
+      ],
+      temperature: attempt === 1 ? 0.72 : 0.64,
+      maxTokens: MAX_OUTPUT_TOKENS,
+    });
+    const result = buildTweetPipeline(raw, source.sourceText);
+    console.log(
+      `[IdeaBird] Pipeline: ${result.diagnostics.generated} generated, ${result.diagnostics.ranked} ranked, ${result.diagnostics.selected} selected`
+    );
+    return result;
   });
 
-  const answer = raw.trim().toLowerCase();
-  return {
-    blocked: /^yes\b/.test(answer),
-    answer,
-  };
+  return { status: 'ok', ...value, model };
 }
 
-async function requestGenerationModel(
-  text: string,
-  modelName: string,
-  attempt: number,
-  deadline: number,
-  signal: AbortSignal
-): Promise<string> {
-  return requestChatCompletion({
-    modelName,
-    deadline,
-    signal,
-    messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: buildUserMessage(text) },
-    ],
-    temperature: attempt === 1 ? 0.72 : 0.64,
-    maxTokens: MAX_OUTPUT_TOKENS,
-  });
-}
-
-async function requestChatCompletion({
+export async function requestChatCompletion({
   modelName,
   messages,
   temperature,
   maxTokens,
   deadline = Infinity,
   signal,
+  thinking,
 }: {
   modelName: string;
   messages: ChatMessage[];
@@ -268,6 +178,8 @@ async function requestChatCompletion({
   maxTokens: number;
   deadline?: number;
   signal?: AbortSignal;
+  /** false asks models that support it to skip hidden reasoning. */
+  thinking?: boolean;
 }): Promise<string> {
   const remainingMs = deadline - Date.now();
   if (remainingMs < MIN_CALL_BUDGET_MS) {
@@ -280,6 +192,8 @@ async function requestChatCompletion({
   const cancel = () => controller.abort();
   signal?.addEventListener('abort', cancel, { once: true });
   const reasoningEffort = useReasoningEffort(modelName) ? REASONING_EFFORT : null;
+  const disableThinking =
+    thinking === false && SUPPORTS_THINKING_TOGGLE.test(modelName) && !thinkingToggleUnsupported.has(modelName);
 
   try {
     const response = await fetch(`${NVIDIA_BASE_URL}/chat/completions`, {
@@ -296,6 +210,7 @@ async function requestChatCompletion({
         temperature,
         max_tokens: maxTokens,
         ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
+        ...(disableThinking ? { chat_template_kwargs: { enable_thinking: false } } : {}),
       }),
     });
 
@@ -306,7 +221,12 @@ async function requestChatCompletion({
         // This endpoint doesn't accept the parameter: stop sending it and retry once.
         console.warn(`[IdeaBird] ${modelName} rejected reasoning_effort; retrying without it.`);
         reasoningEffortUnsupported.add(modelName);
-        return requestChatCompletion({ modelName, messages, temperature, maxTokens, deadline, signal });
+        return requestChatCompletion({ modelName, messages, temperature, maxTokens, deadline, signal, thinking });
+      }
+      if (disableThinking && response.status === 400 && /chat_template|enable_thinking/i.test(String(message))) {
+        console.warn(`[IdeaBird] ${modelName} rejected the thinking toggle; retrying without it.`);
+        thinkingToggleUnsupported.add(modelName);
+        return requestChatCompletion({ modelName, messages, temperature, maxTokens, deadline, signal, thinking });
       }
       throw createError(message, { status: response.status });
     }
@@ -330,7 +250,7 @@ async function requestChatCompletion({
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') {
       if (signal?.aborted) {
-        throw createError('Generation cancelled by the content policy check.');
+        throw createError('The request was cancelled.');
       }
       if (timeoutMs < REQUEST_TIMEOUT_MS) {
         throw budgetExhaustedError();
@@ -351,6 +271,7 @@ async function requestChatCompletion({
 }
 
 const reasoningEffortUnsupported = new Set<string>();
+const thinkingToggleUnsupported = new Set<string>();
 
 function useReasoningEffort(modelName: string): boolean {
   return Boolean(REASONING_EFFORT) && SUPPORTS_REASONING_EFFORT.test(modelName) && !reasoningEffortUnsupported.has(modelName);
@@ -358,7 +279,7 @@ function useReasoningEffort(modelName: string): boolean {
 
 function budgetExhaustedError(): GenerateError {
   return createError(
-    'Generation took too long and was stopped before the server time limit. Try again, or use a shorter excerpt.',
+    'This took too long and was stopped before the server time limit. Please try again.',
     { status: 504, budgetExhausted: true }
   );
 }

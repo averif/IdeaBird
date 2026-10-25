@@ -5,6 +5,7 @@ import { authRouter } from './auth/routes.js';
 import { config } from './config.js';
 import { generateRouter } from './generate/routes.js';
 import { historyRouter } from './history/routes.js';
+import { analyzeRouter } from './vision/routes.js';
 import { errorHandler } from './http.js';
 
 // One Express app serves the API both locally (server/index.ts) and on Vercel
@@ -29,6 +30,8 @@ export function createApp() {
     res.set('Cache-Control', 'no-store');
     next();
   });
+  // Screenshots are sent as base64 to /api/analyze only; everything else stays tiny.
+  app.use('/api/analyze', express.json({ limit: '4.5mb' }));
   app.use(express.json({ limit: '100kb' }));
   app.use(cookieParser());
 
@@ -36,6 +39,7 @@ export function createApp() {
   // Vite proxy locally), so browsers block every cross-origin API call.
 
   app.use('/api/auth', authRouter);
+  app.use('/api/analyze', analyzeRouter);
   app.use('/api/generate', generateRouter);
   app.use('/api/history', historyRouter);
 

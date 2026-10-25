@@ -13,7 +13,7 @@ export function Header({ step, children }: { step: Step; children?: ReactNode })
         </a>
         <div className="header-status" id="workflow-status" data-step={step} aria-label="Workflow">
           <span data-step-label="upload">01 Upload</span>
-          <span data-step-label="edit">02 Edit</span>
+          <span data-step-label="insights">02 Insights</span>
           <span data-step-label="copy">03 Copy</span>
         </div>
         {children}

@@ -6,9 +6,8 @@ import { after, beforeEach, describe, test } from 'node:test';
 // A fake NVIDIA endpoint whose behavior each test controls.
 interface Call {
   model: string;
-  moderation: boolean;
   reasoningEffort?: string;
-  aborted: boolean;
+  thinkingOff: boolean;
 }
 type Behavior = (call: Call) => { delayMs: number; status?: number; content?: string; error?: string };
 
@@ -30,14 +29,10 @@ const server = http.createServer((req, res) => {
     const parsed = JSON.parse(body);
     const call: Call = {
       model: parsed.model,
-      moderation: JSON.stringify(parsed.messages).includes('Answer with exactly one word'),
       reasoningEffort: parsed.reasoning_effort,
-      aborted: false,
+      thinkingOff: parsed.chat_template_kwargs?.enable_thinking === false,
     };
     calls.push(call);
-    res.on('close', () => {
-      if (!res.writableEnded) call.aborted = true;
-    });
 
     const { delayMs, status = 200, content, error } = behavior(call);
     setTimeout(() => {
@@ -46,7 +41,7 @@ const server = http.createServer((req, res) => {
       res.end(
         JSON.stringify(
           status === 200
-            ? { choices: [{ message: { content: content ?? (call.moderation ? 'no' : TWEETS) }, finish_reason: 'stop' }] }
+            ? { choices: [{ message: { content: content ?? TWEETS }, finish_reason: 'stop' }] }
             : { error: { message: error || 'error' } }
         )
       );
@@ -58,80 +53,45 @@ await new Promise<void>((resolve) => server.listen(0, resolve));
 process.env.NVIDIA_BASE_URL = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 process.env.NVIDIA_API_KEY = 'test-key';
 process.env.NVIDIA_MODEL = 'openai/gpt-oss-20b';
-process.env.NVIDIA_FALLBACK_MODELS = 'backup/model';
+process.env.NVIDIA_FALLBACK_MODELS = 'backup/model,nvidia/nemotron-writer';
 process.env.NVIDIA_TIMEOUT_MS = '600';
 process.env.NVIDIA_MODEL_ATTEMPTS = '2';
-process.env.NVIDIA_MODERATION_GRACE_MS = '200';
 process.env.NVIDIA_REASONING_EFFORT = 'low';
 
 const { generateTweetsWithFallback } = await import('./generateService.js');
-const SOURCE = 'Most startups fail because they build features nobody asked for. Talk to 20 customers before writing any code.';
+const SOURCE = {
+  insightBrief: 'Summary: Most startups fail because they build features nobody asked for.',
+  sourceText: 'Most startups fail because they build features nobody asked for. Talk to 20 customers before writing any code.',
+};
 
 beforeEach(() => {
   calls = [];
 });
 after(() => server.close());
 
-async function timed<T>(fn: () => Promise<T>) {
-  const start = Date.now();
-  const result = await fn();
-  return { result, ms: Date.now() - start };
-}
-
-describe('generation speed', () => {
-  test('moderation and generation run in parallel, not back to back', async () => {
-    behavior = () => ({ delayMs: 300 });
-    const { result, ms } = await timed(() => generateTweetsWithFallback(SOURCE));
-    assert.equal(result.status, 'ok');
-    assert.ok(ms < 550, `took ${ms}ms; sequential calls would take ~600ms`);
-    assert.equal(calls.length, 2);
-  });
-
-  test('a block verdict returns immediately and cancels the running generation', async () => {
-    behavior = (call) => (call.moderation ? { delayMs: 50, content: 'yes' } : { delayMs: 500 });
-    const { result, ms } = await timed(() => generateTweetsWithFallback(SOURCE));
-    assert.equal(result.status, 'policy_block');
-    assert.ok(ms < 300, `took ${ms}ms`);
-    await new Promise((r) => setTimeout(r, 50));
-    assert.equal(calls.find((c) => !c.moderation)?.aborted, true);
-  });
-
-  test('a block verdict still wins when it arrives shortly after the posts', async () => {
-    behavior = (call) => (call.moderation ? { delayMs: 150, content: 'yes' } : { delayMs: 50 });
-    const { result } = await timed(() => generateTweetsWithFallback(SOURCE));
-    assert.equal(result.status, 'policy_block');
-  });
-
-  test("slow moderation doesn't hold back finished posts beyond the grace period", async () => {
-    behavior = (call) => (call.moderation ? { delayMs: 2000 } : { delayMs: 50 });
-    const { result, ms } = await timed(() => generateTweetsWithFallback(SOURCE));
-    assert.equal(result.status, 'ok');
-    assert.ok(ms < 500, `took ${ms}ms`);
-  });
-
+describe('model calls', () => {
   test('reasoning_effort=low is sent to gpt-oss and not to other models', async () => {
-    behavior = (call) => (call.model === 'openai/gpt-oss-20b' && !call.moderation ? { delayMs: 10, status: 500 } : { delayMs: 10 });
-    const { result } = await timed(() => generateTweetsWithFallback(SOURCE));
-    assert.equal(result.status, 'ok');
+    behavior = (call) => (call.model === 'openai/gpt-oss-20b' ? { delayMs: 10, status: 500 } : { delayMs: 10 });
+    const result = await generateTweetsWithFallback(SOURCE);
+    assert.equal(result.model, 'backup/model');
     assert.ok(calls.filter((c) => c.model === 'openai/gpt-oss-20b').every((c) => c.reasoningEffort === 'low'));
     assert.ok(calls.filter((c) => c.model === 'backup/model').every((c) => c.reasoningEffort === undefined));
   });
 
   test('a timed-out model is not retried; the next model is tried instead', async () => {
-    behavior = (call) => (call.model === 'openai/gpt-oss-20b' && !call.moderation ? { delayMs: 5000 } : { delayMs: 50 });
-    const { result, ms } = await timed(() => generateTweetsWithFallback(SOURCE));
-    assert.equal(result.status, 'ok');
-    assert.equal(result.status === 'ok' && result.model, 'backup/model');
-    assert.equal(calls.filter((c) => c.model === 'openai/gpt-oss-20b' && !c.moderation).length, 1);
-    assert.ok(ms < 1000, `took ${ms}ms`);
+    behavior = (call) => (call.model === 'openai/gpt-oss-20b' ? { delayMs: 5000 } : { delayMs: 50 });
+    const start = Date.now();
+    const result = await generateTweetsWithFallback(SOURCE);
+    assert.equal(result.model, 'backup/model');
+    assert.equal(calls.filter((c) => c.model === 'openai/gpt-oss-20b').length, 1);
+    assert.ok(Date.now() - start < 1000);
   });
 
   test('if an endpoint rejects reasoning_effort, the call is retried without it', async () => {
     behavior = (call) =>
       call.reasoningEffort ? { delayMs: 10, status: 400, error: 'Unsupported parameter: reasoning_effort' } : { delayMs: 10 };
-    const { result } = await timed(() => generateTweetsWithFallback(SOURCE));
-    assert.equal(result.status, 'ok');
-    assert.equal(result.status === 'ok' && result.model, 'openai/gpt-oss-20b');
+    const result = await generateTweetsWithFallback(SOURCE);
+    assert.equal(result.model, 'openai/gpt-oss-20b');
   });
 });
 
@@ -140,13 +100,32 @@ describe('error reporting', () => {
     behavior = (call) =>
       call.model === 'backup/model'
         ? { delayMs: 10, status: 404, error: "Function 'x': Not found for account 'secret-account'" }
-        : call.moderation
-          ? { delayMs: 10 }
-          : { delayMs: 5000 };
+        : { delayMs: 5000 };
     await assert.rejects(generateTweetsWithFallback(SOURCE), (err: Error & { timedOut?: boolean }) => {
       assert.equal(err.timedOut, true);
       assert.ok(!err.message.includes('secret-account'));
       return true;
     });
+  });
+});
+
+describe('thinking toggle', () => {
+  test('nemotron writers are asked to skip hidden reasoning; other models are not', async () => {
+    behavior = (call) => (call.model.includes('nemotron') ? { delayMs: 10 } : { delayMs: 10, status: 500 });
+    const result = await generateTweetsWithFallback(SOURCE);
+    assert.equal(result.model, 'nvidia/nemotron-writer');
+    assert.ok(calls.filter((c) => c.model.includes('nemotron')).every((c) => c.thinkingOff));
+    assert.ok(calls.filter((c) => !c.model.includes('nemotron')).every((c) => !c.thinkingOff));
+  });
+
+  test('if an endpoint rejects the toggle, the call is retried without it', async () => {
+    behavior = (call) =>
+      !call.model.includes('nemotron')
+        ? { delayMs: 10, status: 500 }
+        : call.thinkingOff
+          ? { delayMs: 10, status: 400, error: 'Unknown field chat_template_kwargs' }
+          : { delayMs: 10 };
+    const result = await generateTweetsWithFallback(SOURCE);
+    assert.equal(result.model, 'nvidia/nemotron-writer');
   });
 });

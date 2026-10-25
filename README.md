@@ -1,11 +1,27 @@
 # IdeaBird - Screenshot -> Content Generator
 
-Upload a screenshot, extract text via OCR, then generate **5 high-signal social content formats** using **NVIDIA NIM**.
+Upload a screenshot. A vision model looks at it, works out what it means and what's worth posting about, and IdeaBird turns that into **5 high-signal social content formats** using **NVIDIA NIM**.
+
+## How it works (vision-first)
+
+```
+Screenshot ─▶ Vision model (primary) ─▶ ScreenshotInsight ─▶ Content angles ─▶ Hot take / Question / Stat-lead / Thread / LinkedIn
+                                              ▲
+             OCR (only if vision reports info it couldn't read) ─┘ supplemental evidence
+```
+
+1. **Analyze** (`POST /api/analyze`): the screenshot goes to a vision model, which returns a structured `ScreenshotInsight`: summary, key facts, exact metrics, notable points, possible stories, content angles and anything it couldn't read. The misinformation check happens in this same call.
+2. **OCR fallback** (rare): only if the vision model flags important information it couldn't read reliably (tiny or dense text), the browser runs Tesseract on the screenshot and `POST /api/analyze/refine` merges that text in as supporting evidence. The visual understanding stays primary, OCR output is never shown to the user, and Tesseract isn't even downloaded on the normal path.
+3. **Generate** (`POST /api/generate`): the writer model receives the insight (plus the angle the user picked), never raw extracted text, so posts tell the story instead of rewriting whatever text was on screen.
+
+The insight is signed by the server (HMAC, bound to the user, 2 h expiry), so the browser can't alter it or skip moderation between steps, and nothing extra is stored.
 
 ## Features
 
 - **Screenshot upload**: drag/drop, click-to-browse, paste from clipboard
-- **OCR extraction** with `tesseract.js` in the browser
+- **Vision understanding** of text, numbers, charts, dashboards, UIs and layout via an NVIDIA vision model
+- **Content angles**: pick the story to tell, or let IdeaBird choose
+- **OCR fallback** with `tesseract.js`, used only when vision can't read something important
 - **Content generation** via an Express or Vercel API calling NVIDIA NIM chat completions
 - **Moderation pre-check** blocks misinformation amplification before generation
 - Generates a hot take tweet, question tweet, stat-lead tweet, thread, and LinkedIn version
@@ -14,14 +30,16 @@ Upload a screenshot, extract text via OCR, then generate **5 high-signal social 
 
 ## Tech Stack
 
-- **Client**: Vite + React + TypeScript, `tesseract.js`
+- **Client**: Vite + React + TypeScript, `tesseract.js` (lazy-loaded fallback)
 - **Server**: Node.js ESM + Express in TypeScript (run with `tsx`), `dotenv`, NVIDIA NIM OpenAI-compatible HTTP API
 - **Auth & data**: Postgres (Neon in production, embedded PGlite for local dev/tests), `jose` (JWT), Node `scrypt` password hashing, `zod` validation, `helmet`
 
 ## Project Structure
 
-- `index.html`, `src/main.tsx`, `src/App.tsx`, `src/components/`, `src/style.css`: React frontend UI, OCR, results rendering
-- `src/api.ts`: client for `POST /api/generate` with friendly error messages
+- `index.html`, `src/main.tsx`, `src/App.tsx`, `src/components/`, `src/style.css`: React frontend (upload, insights, results)
+- `src/api.ts`: client for the analyze / refine / generate endpoints with friendly error messages
+- `src/image.ts`: prepares screenshots for upload (keeps them sharp, under 3 MB); `src/ocr.ts`: the OCR fallback
+- `server/vision/`: vision analysis and OCR merge (`analyze.ts`), `ScreenshotInsight` + signing (`insight.ts`), image validation, routes
 - `src/auth/`: auth state, token handling (`client.ts`), login/signup modal, Google button
 - `server/app.ts`: the Express app (security headers, routes); `server/index.ts` runs it locally, `api/index.ts` on Vercel
 - `server/auth/`: signup/login/Google, JWT access tokens, rotating refresh tokens, password reset, email verification
@@ -47,12 +65,14 @@ Create a `.env` file in the project root:
 ```env
 NVIDIA_API_KEY=your_key_here
 NVIDIA_BASE_URL=https://integrate.api.nvidia.com/v1
-NVIDIA_MODEL=meta/llama-3.3-70b-instruct
-NVIDIA_FALLBACK_MODELS=nvidia/llama-3.3-nemotron-super-49b-v1
-NVIDIA_TIMEOUT_MS=30000
+NVIDIA_VISION_MODEL=nvidia/nemotron-3.5-super-vl-120b-a12b
+NVIDIA_VISION_FALLBACK_MODELS=meta/llama-3.2-11b-vision-instruct
+NVIDIA_MODEL=nvidia/nemotron-3.5-super-vl-120b-a12b
+NVIDIA_FALLBACK_MODELS=meta/llama-3.2-11b-vision-instruct
+NVIDIA_WRITER_THINKING=off
+NVIDIA_TIMEOUT_MS=60000
 NVIDIA_MODEL_ATTEMPTS=1
-NVIDIA_MAX_TOKENS=1600
-NVIDIA_MODERATION_MAX_TOKENS=8
+NVIDIA_MAX_TOKENS=4096
 PORT=3001
 ```
 
@@ -60,12 +80,12 @@ Notes:
 
 - **`NVIDIA_API_KEY` is required**. The server also accepts the old `GEMINI_API_KEY` name as a temporary fallback.
 - **`NVIDIA_BASE_URL`** defaults to `https://integrate.api.nvidia.com/v1`.
-- **`NVIDIA_MODEL`** defaults to `meta/llama-3.3-70b-instruct`.
-- **`NVIDIA_FALLBACK_MODELS`** is an optional comma-separated list tried when the primary model fails.
-- **`NVIDIA_TIMEOUT_MS`** defaults to `30000`.
+- **`NVIDIA_VISION_MODEL`** reads the screenshot (default `nvidia/nemotron-3.5-super-vl-120b-a12b`); **`NVIDIA_VISION_FALLBACK_MODELS`** is tried if it fails (default `meta/llama-3.2-11b-vision-instruct`). Both must be vision models your key can use.
+- **`NVIDIA_MODEL`** writes the posts (default `nvidia/nemotron-3.5-super-vl-120b-a12b`); **`NVIDIA_FALLBACK_MODELS`** is an optional comma-separated list tried when it fails.
+- **`NVIDIA_WRITER_THINKING`** (`off` by default) turns hidden reasoning off for Nemotron writers. In testing this took post generation from minutes to ~15–25s.
+- **`NVIDIA_TIMEOUT_MS`** defaults to `60000` per call; a timed-out model is skipped, not retried.
 - **`NVIDIA_MODEL_ATTEMPTS`** defaults to `1`.
-- **`NVIDIA_MAX_TOKENS`** defaults to `1600`.
-- **`NVIDIA_MODERATION_MAX_TOKENS`** defaults to `8`.
+- **`NVIDIA_MAX_TOKENS`** defaults to `4096`; **`NVIDIA_VISION_MAX_TOKENS`** to `3000`.
 - **`PORT`** defaults to `3001`.
 
 Auth and database variables (see `.env.example` for details):
@@ -144,11 +164,13 @@ In Vercel, add these Environment Variables before redeploying:
 ```env
 NVIDIA_API_KEY=your_key_here
 NVIDIA_BASE_URL=https://integrate.api.nvidia.com/v1
-NVIDIA_MODEL=openai/gpt-oss-20b
+NVIDIA_VISION_MODEL=nvidia/nemotron-3.5-super-vl-120b-a12b
+NVIDIA_VISION_FALLBACK_MODELS=meta/llama-3.2-11b-vision-instruct
+NVIDIA_MODEL=nvidia/nemotron-3.5-super-vl-120b-a12b
+NVIDIA_FALLBACK_MODELS=meta/llama-3.2-11b-vision-instruct
 NVIDIA_TIMEOUT_MS=45000
 NVIDIA_MODEL_ATTEMPTS=1
 NVIDIA_MAX_TOKENS=4096
-NVIDIA_MODERATION_MAX_TOKENS=2048
 NVIDIA_TOTAL_TIMEOUT_MS=55000
 DATABASE_URL=postgres://...neon.tech/neondb?sslmode=require
 JWT_SECRET=<48 random bytes, base64>
@@ -182,14 +204,24 @@ Known trade-off: signup answers "an account with this email already exists", whi
 
 Auth endpoints live under `/api/auth`: `signup`, `login`, `google`, `refresh`, `logout`, `logout-all`, `me`, `verify-email`, `resend-verification`, `forgot-password`, `reset-password`, and `config`. History: `GET /api/history`, `GET /api/history/:id`, `DELETE /api/history/:id`. All of them except the public auth ones require `Authorization: Bearer <access token>`.
 
+### `POST /api/analyze`
+
+Body: `{ "image": "data:image/png;base64,..." }` (PNG, JPEG or WebP, max 3 MB; the bytes are checked, not just the declared type).
+
+Response: `{ "status": "ok", "insight": ScreenshotInsight, "insightToken": "...", "needsOcr": false, "model": "..." }`, or `{ "status": "policy_block", "error": "..." }`.
+
+### `POST /api/analyze/refine`
+
+Only when `needsOcr` is true. Body: `{ "insight", "insightToken", "ocrText" }`. Returns the updated insight and a new token. If the merge fails, the visual analysis is returned unchanged.
+
 ### `POST /api/generate`
 
-Requires `Authorization: Bearer <access token>`. Saves the result to the user's history and returns its `id`.
+Requires `Authorization: Bearer <access token>`. Saves the result to the user's history (the insight's summary, facts and metrics; never the image) and returns its `id`.
 
 Body:
 
 ```json
-{ "text": "string" }
+{ "insight": { "summary": "...", "metrics": [] }, "insightToken": "...", "angle": "optional, one of insight.contentAngles" }
 ```
 
 Response:
@@ -209,10 +241,8 @@ Response:
 
 Validation:
 
-- Rejects empty text
-- Rejects input longer than **10,000 characters**
-- Runs a moderation classifier before generation
-- Returns `status: "policy_block"` instead of generating amplified versions of unverified political allegations, conspiracy claims, or health misinformation
+- Rejects insights that weren't issued by `/api/analyze` for this user (or were modified)
+- Moderation runs during analysis; a blocked screenshot gets `status: "policy_block"` and no token, so posts can't be generated from it
 - Generates exactly **5 post-ready content formats**
 - Scores each candidate for human-likeness, emotional impact, originality, punchiness, and platform-native style
 - Returns objects with `style` and `tweet`
@@ -227,4 +257,5 @@ We don't generate amplified versions of unverified political allegations or heal
 - **401/403 invalid API key**: check that your key was copied from NVIDIA NIM and has not expired.
 - **429 rate limited**: try again later or set `NVIDIA_MODEL` / `NVIDIA_FALLBACK_MODELS` to another available model.
 - **503 overloaded**: NVIDIA NIM is temporarily overloaded; retry after a moment.
-- **OCR returns empty**: try a higher-contrast screenshot or crop tighter around the text.
+- **"The configured AI model is not available for this NVIDIA API key"**: your key can't use one of the models. Check which models your account can reach on build.nvidia.com and set `NVIDIA_VISION_MODEL` / `NVIDIA_MODEL` (and fallbacks) accordingly.
+- **Slow or timed-out analysis**: NVIDIA's free endpoints queue requests and response times vary a lot. Calls stop after `NVIDIA_TIMEOUT_MS` and move to the fallback model.

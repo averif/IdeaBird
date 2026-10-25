@@ -72,7 +72,7 @@ export function HistoryStep({ active, onNew, showToast }: HistoryStepProps) {
         <>
           <div className="history-source">
             <div className="panel-header">
-              <span>Source text</span>
+              <span>Screenshot summary</span>
             </div>
             <p>{openItem.sourceText}</p>
           </div>

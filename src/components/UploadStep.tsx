@@ -44,7 +44,7 @@ export function UploadStep({ active, onFile }: UploadStepProps) {
             Turn screenshots into
             <span className="muted">publish-ready posts.</span>
           </h1>
-          <p className="step-desc">Minimal OCR-to-post studio for quick, human-sounding output.</p>
+          <p className="step-desc">IdeaBird looks at your screenshot, finds the story, and writes human-sounding posts.</p>
         </div>
 
         <div
@@ -89,7 +89,7 @@ export function UploadStep({ active, onFile }: UploadStepProps) {
 
       <aside className="signal-panel" aria-label="Output overview">
         <span>5 outputs</span>
-        <span>OCR</span>
+        <span>Reads charts &amp; UIs</span>
         <span>Posts + thread</span>
       </aside>
     </section>

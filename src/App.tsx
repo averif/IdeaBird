@@ -1,27 +1,30 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import Tesseract from 'tesseract.js';
-import { AuthRequiredError, postGenerateRequest } from './api';
+import { analyzeScreenshot, AuthRequiredError, generatePosts, refineWithOcr } from './api';
 import { useAuth } from './auth/AuthContext';
 import { AuthModal, type AuthMode } from './auth/AuthModal';
 import { Header } from './components/Header';
 import { HistoryStep } from './components/HistoryStep';
 import { UserMenu } from './components/UserMenu';
 import { UploadStep } from './components/UploadStep';
-import { ExtractStep, type OcrProgress } from './components/ExtractStep';
+import { InsightsStep, type AnalysisStatus } from './components/InsightsStep';
 import { ResultsStep } from './components/ResultsStep';
 import { GeneratingOverlay } from './components/GeneratingOverlay';
 import { Toast, useToast } from './components/Toast';
-import type { Step, Tweet } from './types';
+import { prepareImage } from './image';
+import { recognizeText } from './ocr';
+import type { Analysis, Step, Tweet } from './types';
 
 const VALID_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/bmp', 'image/gif'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
-const IDLE_OCR: OcrProgress = { active: false, percent: 0, label: 'Initializing OCR...' };
+const IDLE: AnalysisStatus = { active: false, label: '', error: null };
+const POLICY_FALLBACK = 'IdeaBird cannot generate amplified versions of unverified allegations or misinformation.';
 
 export default function App() {
   const [step, setStep] = useState<Step>('upload');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [text, setText] = useState('');
-  const [ocr, setOcr] = useState<OcrProgress>(IDLE_OCR);
+  const [analysis, setAnalysis] = useState<Analysis | null>(null);
+  const [status, setStatus] = useState<AnalysisStatus>(IDLE);
+  const [selectedAngle, setSelectedAngle] = useState<string | null>(null);
   const [tweets, setTweets] = useState<Tweet[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const { toast, showToast } = useToast();
@@ -30,10 +33,13 @@ export default function App() {
   const [resetToken, setResetToken] = useState<string | null>(null);
 
   const generatingRef = useRef(false);
-  // Set when Generate was clicked while logged out; generation resumes after login.
+  // Work interrupted by the login prompt; it resumes after login.
   const pendingGenerateRef = useRef(false);
-  // Bumped on every new upload / start over so a slow OCR job can't overwrite newer state.
-  const ocrRunRef = useRef(0);
+  const pendingFileRef = useRef<File | null>(null);
+  // The current screenshot, kept for retries and the OCR fallback.
+  const fileRef = useRef<File | null>(null);
+  // Bumped on every new upload / start over so a slow analysis can't overwrite newer state.
+  const runRef = useRef(0);
 
   // --- Step Navigation ---
   const goToStep = useCallback((next: Step) => {
@@ -64,47 +70,80 @@ export default function App() {
     [showToast]
   );
 
-  // --- Handle File ---
-  const handleFile = useCallback(
+  // --- Analyze: vision first, OCR only if the vision model asks for it ---
+  const analyze = useCallback(
     async (file: File) => {
-      if (!validateFile(file)) return;
-      const run = ++ocrRunRef.current;
-
-      replacePreview(URL.createObjectURL(file));
-      goToStep('edit');
-      setText('');
-      setOcr({ active: true, percent: 0, label: 'Initializing OCR engine...' });
+      const run = ++runRef.current;
+      const stale = () => run !== runRef.current;
+      setAnalysis(null);
+      setSelectedAngle(null);
+      setStatus({ active: true, label: 'Reading your screenshot...', error: null });
 
       try {
-        const result = await Tesseract.recognize(file, 'eng', {
-          logger: (m) => {
-            if (run !== ocrRunRef.current) return;
-            const percent = Math.round(m.progress * 100);
-            if (m.status === 'recognizing text') {
-              setOcr({ active: true, percent, label: `Recognizing text... ${percent}%` });
-            } else if (m.status === 'loading language traineddata') {
-              setOcr({ active: true, percent, label: `Loading language data... ${percent}%` });
-            }
-          },
-        });
-        if (run !== ocrRunRef.current) return;
+        const result = await analyzeScreenshot(await prepareImage(file));
+        if (stale()) return;
 
-        const extracted = result.data.text.trim();
-        setOcr((current) => ({ ...current, active: false }));
-        if (!extracted) {
-          showToast('IdeaBird could not find text in this screenshot.', 'error');
+        if (result.status === 'policy_block') {
+          showToast(result.error || POLICY_FALLBACK, 'error', 7000);
+          setStatus(IDLE);
+          goToStep('upload');
           return;
         }
+        if (!result.insight || !result.insightToken) throw new Error('IdeaBird could not understand this screenshot.');
 
-        setText(extracted);
+        let current: Analysis = { insight: result.insight, insightToken: result.insightToken };
+
+        if (result.needsOcr) {
+          // Vision flagged something it couldn't read reliably (tiny or dense text).
+          // Recover just that with OCR and merge it in as supporting evidence.
+          setStatus({ active: true, label: 'Double-checking small details...', error: null });
+          const ocrText = await recognizeText(file).catch((err) => {
+            console.warn('OCR fallback failed; using the visual analysis only.', err);
+            return '';
+          });
+          if (stale()) return;
+          if (ocrText) {
+            const refined = await refineWithOcr(current, ocrText).catch(() => null);
+            if (stale()) return;
+            if (refined?.insight && refined.insightToken) current = { insight: refined.insight, insightToken: refined.insightToken };
+          }
+        }
+
+        setAnalysis(current);
+        setStatus(IDLE);
       } catch (err) {
-        if (run !== ocrRunRef.current) return;
-        console.error('OCR error:', err);
-        showToast('OCR failed. Try a cleaner image.', 'error');
-        setOcr((current) => ({ ...current, active: false }));
+        if (stale()) return;
+        if (err instanceof AuthRequiredError) {
+          pendingFileRef.current = file;
+          setStatus(IDLE);
+          setAuthModal({ mode: 'login', reason: 'Your session ended. Log in again to continue.' });
+          return;
+        }
+        console.error('Analyze error:', err);
+        setStatus({ active: false, label: '', error: err instanceof Error ? err.message : 'Could not analyze this screenshot.' });
       }
     },
-    [validateFile, replacePreview, goToStep, showToast]
+    [goToStep, showToast]
+  );
+
+  // --- Handle File ---
+  const handleFile = useCallback(
+    (file: File) => {
+      if (!validateFile(file)) return;
+
+      // Analysis runs on our servers, so it needs an account.
+      if (auth.status !== 'authenticated') {
+        pendingFileRef.current = file;
+        setAuthModal({ mode: 'signup', reason: 'Sign up or log in so IdeaBird can read your screenshot.' });
+        return;
+      }
+
+      fileRef.current = file;
+      replacePreview(URL.createObjectURL(file));
+      goToStep('insights');
+      analyze(file);
+    },
+    [validateFile, auth.status, replacePreview, goToStep, analyze]
   );
 
   // Paste support
@@ -127,12 +166,11 @@ export default function App() {
 
   // --- Generate Tweets ---
   const generateTweets = useCallback(async () => {
-    const source = text.trim();
-    if (!source || generatingRef.current) return;
+    if (!analysis || generatingRef.current) return;
 
     if (auth.status !== 'authenticated') {
       pendingGenerateRef.current = true;
-      setAuthModal({ mode: 'signup', reason: 'Sign up or log in to generate posts. Your text stays right here.' });
+      setAuthModal({ mode: 'login', reason: 'Log in to generate posts.' });
       return;
     }
 
@@ -140,18 +178,10 @@ export default function App() {
     setIsGenerating(true);
 
     try {
-      const { res, data } = await postGenerateRequest(source);
-
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to generate content');
-      }
+      const data = await generatePosts(analysis, selectedAngle);
 
       if (data.status === 'policy_block') {
-        showToast(
-          data.error || 'IdeaBird cannot generate amplified versions of unverified allegations or misinformation.',
-          'error',
-          7000
-        );
+        showToast(data.error || POLICY_FALLBACK, 'error', 7000);
         return;
       }
 
@@ -174,15 +204,20 @@ export default function App() {
       generatingRef.current = false;
       setIsGenerating(false);
     }
-  }, [text, auth.status, goToStep, showToast]);
+  }, [analysis, selectedAngle, auth.status, goToStep, showToast]);
 
-  // Resume a Generate click that was interrupted by the login prompt.
+  // Resume work that was interrupted by the login prompt.
   useEffect(() => {
-    if (auth.status === 'authenticated' && pendingGenerateRef.current && !authModal) {
+    if (auth.status !== 'authenticated' || authModal) return;
+    if (pendingFileRef.current) {
+      const file = pendingFileRef.current;
+      pendingFileRef.current = null;
+      handleFile(file);
+    } else if (pendingGenerateRef.current) {
       pendingGenerateRef.current = false;
       generateTweets();
     }
-  }, [auth.status, authModal, generateTweets]);
+  }, [auth.status, authModal, handleFile, generateTweets]);
 
   // History is private: leave it as soon as the session ends.
   useEffect(() => {
@@ -215,27 +250,34 @@ export default function App() {
 
   const closeAuthModal = useCallback(() => {
     pendingGenerateRef.current = false;
+    pendingFileRef.current = null;
     setAuthModal(null);
   }, []);
 
   const onAuthenticated = useCallback(() => {
     setAuthModal(null);
     setResetToken(null);
-    if (!pendingGenerateRef.current) showToast('You are logged in.', 'success');
+    if (!pendingGenerateRef.current && !pendingFileRef.current) showToast('You are logged in.', 'success');
   }, [showToast]);
 
   // --- Button Handlers ---
   const startOver = () => {
-    ocrRunRef.current += 1;
+    runRef.current += 1;
+    fileRef.current = null;
     replacePreview(null);
-    setText('');
+    setAnalysis(null);
+    setStatus(IDLE);
+    setSelectedAngle(null);
     setTweets([]);
-    setOcr(IDLE_OCR);
     goToStep('upload');
   };
 
+  const retryAnalysis = () => {
+    if (fileRef.current) analyze(fileRef.current);
+  };
+
   const regenerate = () => {
-    goToStep('edit');
+    goToStep('insights');
     // Small delay then auto-trigger
     setTimeout(() => generateTweets(), 100);
   };
@@ -253,13 +295,15 @@ export default function App() {
 
       <main className="main" id="main">
         <UploadStep active={step === 'upload'} onFile={handleFile} />
-        <ExtractStep
-          active={step === 'edit'}
+        <InsightsStep
+          active={step === 'insights'}
           previewUrl={previewUrl}
-          text={text}
-          onTextChange={setText}
-          ocr={ocr}
-          canGenerate={text.trim().length > 0 && !isGenerating}
+          insight={analysis?.insight ?? null}
+          status={status}
+          selectedAngle={selectedAngle}
+          onSelectAngle={setSelectedAngle}
+          canGenerate={Boolean(analysis) && !status.active && !isGenerating}
+          onRetry={retryAnalysis}
           onBack={() => goToStep('upload')}
           onGenerate={generateTweets}
         />
