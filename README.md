@@ -44,7 +44,7 @@ The insight is signed by the server (HMAC, bound to the user, 2 h expiry), so th
 - `server/app.ts`: the Express app (security headers, routes); `server/index.ts` runs it locally, `api/index.ts` on Vercel
 - `server/auth/`: signup/login/Google, JWT access tokens, rotating refresh tokens, password reset, email verification
 - `server/history/routes.ts`, `server/generate/routes.ts`: per-user generation history and the generate endpoint
-- `server/db/schema.sql`: database schema; `server/security/rateLimit.ts`: Postgres-backed rate limits
+- `server/db/schema.ts`: database schema (applied automatically on first use); `server/security/rateLimit.ts`: Postgres-backed rate limits
 - `server/auth.test.ts`: integration tests for auth, token tampering, CSRF, rate limits and cross-user isolation
 - `server/generateService.ts`: moderation check, NVIDIA NIM calls, model fallback chain
 - `server/prompt.ts`: system prompt and user prompt builder for the model
@@ -114,7 +114,7 @@ npm run dev
 - Vite dev server runs on `http://localhost:5173`
 - API runs on `http://localhost:3001`
 - Vite proxies `/api/*` to `http://localhost:3001` through `vite.config.ts`
-- With `DATABASE_URL=pglite:...` the schema is created automatically. Against real Postgres, run `npm run db:migrate` once (and after schema changes).
+- The database schema is created automatically on first use (embedded PGlite or real Postgres). `npm run db:migrate` does the same up front if you prefer.
 - Password-reset and verification emails are printed to the API console unless `RESEND_API_KEY` is set.
 
 ### Tests
@@ -155,7 +155,7 @@ npm run preview
 Before the first deploy:
 
 1. Create a Neon database (or Vercel Postgres, which is Neon) and copy the **pooled** connection string.
-2. Run the migration against it once: `DATABASE_URL=<neon url> npm run db:migrate`.
+2. Add `DATABASE_URL`, `JWT_SECRET` and `APP_URL` (with `https://`) to the Vercel project's environment variables, then redeploy. Tables are created automatically on the first request. If any of these is missing, every API call answers with a message naming it.
 3. For Google sign-in, create an OAuth client ID (type "Web application") in Google Cloud Console and add your production URL (and `http://localhost:5173`) to **Authorized JavaScript origins**.
 4. For password-reset emails, create a Resend API key and verify your sending domain.
 

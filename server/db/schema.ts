@@ -1,5 +1,7 @@
--- IdeaBird schema. Idempotent: safe to run on every deploy via `npm run db:migrate`.
-
+// IdeaBird schema. Idempotent: applied automatically on first database use (see
+// ./index.ts) and by `npm run db:migrate`. Kept in a .ts module, not a .sql file,
+// so serverless bundlers always ship it with the function.
+export const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS users (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   email               text NOT NULL UNIQUE,          -- always stored lowercased
@@ -59,3 +61,4 @@ CREATE TABLE IF NOT EXISTS rate_limits (
   count     integer NOT NULL,
   reset_at  timestamptz NOT NULL
 );
+`;

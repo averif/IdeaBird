@@ -2,7 +2,7 @@ import cookieParser from 'cookie-parser';
 import express from 'express';
 import helmet from 'helmet';
 import { authRouter } from './auth/routes.js';
-import { config } from './config.js';
+import { config, ConfigError } from './config.js';
 import { generateRouter } from './generate/routes.js';
 import { historyRouter } from './history/routes.js';
 import { analyzeRouter } from './vision/routes.js';
@@ -11,9 +11,21 @@ import { errorHandler } from './http.js';
 // One Express app serves the API both locally (server/index.ts) and on Vercel
 // (api/index.ts), so every route has a single implementation.
 export function createApp() {
-  config(); // fail fast on missing secrets
-
   const app = express();
+
+  // Missing or invalid settings must not crash the function at import time: on
+  // Vercel that surfaces only as an opaque FUNCTION_INVOCATION_FAILED page. Answer
+  // every API call with a clear JSON error instead (setting names only, no values).
+  try {
+    config();
+  } catch (err) {
+    const message = err instanceof ConfigError ? err.message : 'Server configuration is invalid.';
+    console.error(`[IdeaBird] ${message}`);
+    app.use('/api', (_req, res) => {
+      res.status(503).set('Cache-Control', 'no-store').json({ error: `IdeaBird isn't fully set up on the server. ${message}` });
+    });
+    return app;
+  }
 
   // Vercel's edge sets X-Forwarded-For, so req.ip is the real client there.
   // Locally there's no proxy we control, so the header must not be trusted.

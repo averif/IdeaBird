@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { createApp } from './app.js';
+import { config } from './config.js';
 import { assertApiKey, NIM_CONFIG } from './generateService.js';
 
 const PORT = process.env.PORT || 3001;
@@ -11,13 +12,15 @@ try {
   process.exit(1);
 }
 
-let app;
+// Locally, fail fast with a readable message instead of serving 503s.
 try {
-  app = createApp();
+  config();
 } catch (err) {
   console.error(`\x1b[31mX ${(err as Error).message}\x1b[0m`);
   process.exit(1);
 }
+
+const app = createApp();
 
 // Express 5 hands listen errors (e.g. port in use) to this callback.
 app.listen(PORT, (err?: Error) => {
