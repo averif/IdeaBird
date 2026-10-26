@@ -108,11 +108,26 @@ async function api(method: string, path: string, token?: string, body?: unknown)
 }
 
 let n = 0;
+/** Signs up and enters the emailed code (the dev mailer prints it to the console). */
 async function signup() {
   await query(`DELETE FROM rate_limits`);
-  const r = await api('POST', '/api/auth/signup', undefined, { email: `v${++n}-${Date.now()}@example.com`, password: 'long enough pw' });
+  const email = `v${++n}-${Date.now()}@example.com`;
+  const original = console.log;
+  let mail = '';
+  console.log = (...args: unknown[]) => {
+    mail += args.join(' ');
+  };
+  let r;
+  try {
+    r = await api('POST', '/api/auth/signup', undefined, { email, password: 'long enough pw' });
+  } finally {
+    console.log = original;
+  }
   assert.equal(r.status, 201);
-  return r.data.accessToken as string;
+  const code = /\b(\d{6})\b/.exec(mail)?.[1];
+  const v = await api('POST', '/api/auth/verify-email-code', undefined, { email, code });
+  assert.equal(v.status, 200);
+  return v.data.accessToken as string;
 }
 
 describe('vision-first pipeline', () => {

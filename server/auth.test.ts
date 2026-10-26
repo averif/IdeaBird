@@ -51,25 +51,55 @@ const csrf = { 'X-Requested-With': 'IdeaBird' };
 let n = 0;
 const uniqueEmail = () => `user${++n}-${Date.now()}@example.com`;
 
+/** Runs `action` and returns everything the dev mailer printed (emails go to the console in tests). */
+async function captureMail<T>(action: () => Promise<T>): Promise<{ result: T; mail: string }> {
+  const original = console.log;
+  let mail = '';
+  console.log = (...args: unknown[]) => {
+    mail += args.join(' ') + '\n';
+  };
+  try {
+    return { result: await action(), mail };
+  } finally {
+    console.log = original;
+  }
+}
+
+const codeIn = (mail: string) => /\b(\d{6})\b/.exec(mail)?.[1] ?? '';
+
+/** Signs up and completes the emailed-code step, returning a logged-in user. */
 async function signup(email = uniqueEmail(), password = 'correct horse battery') {
   // Every test request comes from 127.0.0.1; don't let the per-IP signup limit
   // bleed between tests (it has its own test below).
   await query(`DELETE FROM rate_limits WHERE key LIKE 'signup:%'`);
-  const r = await api('POST', '/api/auth/signup', { body: { email, password } });
+  const { result: r, mail } = await captureMail(() => api('POST', '/api/auth/signup', { body: { email, password } }));
   assert.equal(r.status, 201, JSON.stringify(r.data));
-  return { email, password, token: r.data.accessToken as string, cookie: r.cookie!, id: r.data.user.id as string };
+  assert.equal(r.data.status, 'verification_required');
+
+  const v = await api('POST', '/api/auth/verify-email-code', { body: { email, code: codeIn(mail) } });
+  assert.equal(v.status, 200, JSON.stringify(v.data));
+  return { email, password, token: v.data.accessToken as string, cookie: v.cookie!, id: v.data.user.id as string };
 }
 
 describe('signup and login', () => {
-  test('signup returns an access token, an httpOnly strict refresh cookie, and no password data', async () => {
+  test('signup issues no session until the emailed code is entered', async () => {
     await query(`DELETE FROM rate_limits WHERE key LIKE 'signup:%'`);
-    const r = await api('POST', '/api/auth/signup', { body: { email: uniqueEmail(), password: 'long enough pw' } });
+    const email = uniqueEmail();
+    const { result: r, mail } = await captureMail(() => api('POST', '/api/auth/signup', { body: { email, password: 'long enough pw' } }));
     assert.equal(r.status, 201);
-    assert.ok(r.data.accessToken);
-    assert.equal(r.data.user.password_hash, undefined);
-    assert.match(r.setCookie, /HttpOnly/i);
-    assert.match(r.setCookie, /SameSite=Strict/i);
-    assert.match(r.setCookie, /Path=\/api\/auth/i);
+    // No email provider in tests, so the dev server reports that the code went to the console.
+    assert.deepEqual(r.data, { status: 'verification_required', email, delivery: 'console' });
+    assert.equal(r.cookie, undefined);
+    assert.match(mail, /verification code/i);
+
+    const v = await api('POST', '/api/auth/verify-email-code', { body: { email, code: codeIn(mail) } });
+    assert.equal(v.status, 200);
+    assert.ok(v.data.accessToken);
+    assert.equal(v.data.user.emailVerified, true);
+    assert.equal(v.data.user.password_hash, undefined);
+    assert.match(v.setCookie, /HttpOnly/i);
+    assert.match(v.setCookie, /SameSite=Strict/i);
+    assert.match(v.setCookie, /Path=\/api\/auth/i);
   });
 
   test('signup is rate limited per IP', async () => {
@@ -246,15 +276,6 @@ describe('password reset and email verification', () => {
     assert.ok(rows.length > 0);
     assert.ok(rows.every((r) => r.token_hash !== token));
   });
-
-  test('verification link marks the email verified', async () => {
-    const email = uniqueEmail();
-    await query(`DELETE FROM rate_limits WHERE key LIKE 'signup:%'`);
-    const token = await captureMailLink(() => api('POST', '/api/auth/signup', { body: { email, password: 'long enough pw' } }), 'verify');
-    assert.equal((await api('POST', '/api/auth/verify-email', { body: { token } })).status, 200);
-    const [row] = await query<{ email_verified: boolean }>('SELECT email_verified FROM users WHERE email = $1', [email]);
-    assert.equal(row.email_verified, true);
-  });
 });
 
 describe('data isolation', () => {
@@ -323,5 +344,88 @@ describe('hardening', () => {
     const r = await fetch(`${base}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{bad json' });
     assert.equal(r.status, 400);
     assert.deepEqual(await r.json(), { error: 'Invalid JSON request body.' });
+  });
+});
+
+describe('email verification code', () => {
+  async function pendingSignup() {
+    await query(`DELETE FROM rate_limits WHERE key LIKE 'signup:%'`);
+    const email = uniqueEmail();
+    const { mail } = await captureMail(() => api('POST', '/api/auth/signup', { body: { email, password: 'long enough pw' } }));
+    return { email, code: codeIn(mail) };
+  }
+
+  test('a wrong code is rejected and the account stays locked', async () => {
+    const { email, code } = await pendingSignup();
+    const wrong = code === '000000' ? '111111' : '000000';
+    assert.equal((await api('POST', '/api/auth/verify-email-code', { body: { email, code: wrong } })).status, 400);
+    const [row] = await query<{ email_verified: boolean }>('SELECT email_verified FROM users WHERE email = $1', [email]);
+    assert.equal(row.email_verified, false);
+  });
+
+  test('a code works only once', async () => {
+    const { email, code } = await pendingSignup();
+    assert.equal((await api('POST', '/api/auth/verify-email-code', { body: { email, code } })).status, 200);
+    assert.equal((await api('POST', '/api/auth/verify-email-code', { body: { email, code } })).status, 400);
+  });
+
+  test('five wrong guesses burn the code, even if the right one comes next', async () => {
+    const { email, code } = await pendingSignup();
+    const wrong = code === '000000' ? '111111' : '000000';
+    for (let i = 0; i < 5; i++) {
+      assert.equal((await api('POST', '/api/auth/verify-email-code', { body: { email, code: wrong } })).status, 400);
+    }
+    const blocked = await api('POST', '/api/auth/verify-email-code', { body: { email, code } });
+    assert.equal(blocked.status, 429);
+  });
+
+  test('resend issues a new code and invalidates the old one, with a cooldown', async () => {
+    const { email, code: first } = await pendingSignup();
+    // The signup itself started the cooldown; skip it for this test.
+    await query(`DELETE FROM rate_limits WHERE key LIKE 'otp-cooldown:%'`);
+    const { result: resent, mail } = await captureMail(() => api('POST', '/api/auth/resend-verification-code', { body: { email } }));
+    assert.equal(resent.status, 200);
+    const second = codeIn(mail);
+    assert.ok(second);
+
+    const again = await api('POST', '/api/auth/resend-verification-code', { body: { email } });
+    assert.equal(again.status, 429, 'second resend inside 30s is refused');
+
+    if (first !== second) {
+      assert.equal((await api('POST', '/api/auth/verify-email-code', { body: { email, code: first } })).status, 400);
+    }
+    assert.equal((await api('POST', '/api/auth/verify-email-code', { body: { email, code: second } })).status, 200);
+  });
+
+  test('resend answers identically for unknown emails', async () => {
+    const unknown = await api('POST', '/api/auth/resend-verification-code', { body: { email: uniqueEmail() } });
+    assert.equal(unknown.status, 200);
+    assert.ok(unknown.data.ok);
+  });
+
+  test('logging in to an unverified account asks for a code instead of issuing a session', async () => {
+    const { email } = await pendingSignup();
+    await query(`DELETE FROM rate_limits WHERE key LIKE 'otp-%'`);
+    const { result: login, mail } = await captureMail(() =>
+      api('POST', '/api/auth/login', { body: { email, password: 'long enough pw' } })
+    );
+    assert.equal(login.status, 200);
+    assert.equal(login.data.status, 'verification_required');
+    assert.equal(login.data.accessToken, undefined);
+    assert.equal(login.cookie, undefined);
+
+    const v = await api('POST', '/api/auth/verify-email-code', { body: { email, code: codeIn(mail) } });
+    assert.equal(v.status, 200);
+    assert.ok(v.data.accessToken);
+  });
+
+  test('codes are stored as keyed hashes, never in plain text', async () => {
+    const { email, code } = await pendingSignup();
+    const rows = await query<{ token_hash: string }>(
+      `SELECT t.token_hash FROM email_tokens t JOIN users u ON u.id = t.user_id WHERE u.email = $1 AND t.purpose = 'verify'`,
+      [email]
+    );
+    assert.ok(rows.length > 0);
+    assert.ok(rows.every((r) => !r.token_hash.includes(code) && r.token_hash.length === 64));
   });
 });

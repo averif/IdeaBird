@@ -1,3 +1,4 @@
+import nodemailer, { type Transporter } from 'nodemailer';
 import { config } from './config.js';
 
 interface Mail {
@@ -6,31 +7,76 @@ interface Mail {
   text: string;
 }
 
+/** Thrown when a configured provider failed to accept the message. */
+export class MailError extends Error {}
+
+/** How mail is delivered on this server. */
+export type MailDelivery = 'resend' | 'smtp' | 'console' | 'none';
+
+export function mailDelivery(): MailDelivery {
+  const { resendApiKey, smtp, isProduction } = config();
+  if (resendApiKey) return 'resend';
+  if (smtp) return 'smtp';
+  // Printing emails (including codes and reset links) is only acceptable locally.
+  return isProduction ? 'none' : 'console';
+}
+
+let transporter: Transporter | null = null;
+
+function smtpTransport(): Transporter {
+  const smtp = config().smtp!;
+  transporter ??= nodemailer.createTransport({
+    host: smtp.host,
+    port: smtp.port,
+    secure: smtp.port === 465, // 465 = TLS from the start; 587 upgrades with STARTTLS
+    requireTLS: smtp.port !== 465,
+    auth: { user: smtp.user, pass: smtp.pass },
+  });
+  return transporter;
+}
+
 /**
- * Sends transactional email through Resend when RESEND_API_KEY is set. In local
- * development without a key, the message (including its link) is printed to the
- * server console instead. In production without a key nothing is logged, because
- * reset links in logs would be live credentials.
+ * Sends transactional email: Resend when RESEND_API_KEY is set, otherwise SMTP
+ * (e.g. Gmail) when SMTP_USER/SMTP_PASS are set. In local development with
+ * neither, the message is printed to the server console. Throws MailError if
+ * the provider rejects the message, so callers never claim an email was sent
+ * when it wasn't.
  */
 export async function sendMail({ to, subject, text }: Mail): Promise<void> {
-  const { resendApiKey, mailFrom, isProduction } = config();
+  const delivery = mailDelivery();
+  const from = config().mailFrom;
 
-  if (!resendApiKey) {
-    if (isProduction) {
-      console.error('[mail] RESEND_API_KEY is not set; email was not sent.');
-    } else {
-      console.log(`\n\x1b[35m[mail] To: ${to}\n[mail] Subject: ${subject}\n${text}\x1b[0m\n`);
-    }
+  if (delivery === 'console') {
+    console.log(`\n\x1b[35m[mail] (no email provider configured: printing instead of sending)\n[mail] To: ${to}\n[mail] Subject: ${subject}\n${text}\x1b[0m\n`);
     return;
+  }
+
+  if (delivery === 'none') {
+    console.error('[mail] No email provider is configured (RESEND_API_KEY or SMTP_USER/SMTP_PASS); email was not sent.');
+    throw new MailError('Email is not configured on this server.');
+  }
+
+  if (delivery === 'smtp') {
+    try {
+      await smtpTransport().sendMail({ from, to, subject, text });
+      return;
+    } catch (err) {
+      // Never log credentials; the error message and code are enough to debug.
+      const e = err as { code?: string; responseCode?: number; message?: string };
+      console.error(`[mail] SMTP send failed (${e.code ?? ''} ${e.responseCode ?? ''}): ${e.message?.slice(0, 200)}`);
+      throw new MailError('The email could not be sent.');
+    }
   }
 
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: mailFrom, to, subject, text }),
-  });
+    headers: { Authorization: `Bearer ${config().resendApiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from, to, subject, text }),
+  }).catch(() => null);
 
-  if (!response.ok) {
-    console.error(`[mail] Resend rejected the email (HTTP ${response.status}).`);
+  if (!response?.ok) {
+    const detail = response ? await response.text().catch(() => '') : 'network error';
+    console.error(`[mail] Resend rejected the email (HTTP ${response?.status ?? '-'}): ${detail.slice(0, 300)}`);
+    throw new MailError('The email could not be sent.');
   }
 }

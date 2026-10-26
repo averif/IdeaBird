@@ -43,7 +43,19 @@ function load() {
     appOrigin,
     googleClientId: process.env.GOOGLE_CLIENT_ID || '',
     resendApiKey: process.env.RESEND_API_KEY || '',
-    mailFrom: process.env.MAIL_FROM || 'IdeaBird <onboarding@resend.dev>',
+    // SMTP (e.g. Gmail with an App Password). Used when RESEND_API_KEY isn't set.
+    smtp: process.env.SMTP_USER && process.env.SMTP_PASS
+      ? {
+          host: process.env.SMTP_HOST || 'smtp.gmail.com',
+          port: Number(process.env.SMTP_PORT || 465),
+          user: process.env.SMTP_USER,
+          // Google shows App Passwords with spaces; they aren't part of it.
+          pass: process.env.SMTP_PASS.replace(/\s+/g, ''),
+        }
+      : null,
+    mailFrom:
+      process.env.MAIL_FROM ||
+      (process.env.SMTP_USER && !process.env.RESEND_API_KEY ? `IdeaBird <${process.env.SMTP_USER}>` : 'IdeaBird <onboarding@resend.dev>'),
     generateLimitPerHour: Number(process.env.GENERATE_RATE_LIMIT_PER_HOUR || 30),
   };
 }
@@ -56,7 +68,9 @@ export function config() {
 export const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 export const REFRESH_TOKEN_TTL_DAYS = 30;
 export const RESET_TOKEN_TTL_MINUTES = 30;
-export const VERIFY_TOKEN_TTL_HOURS = 24;
+// Email verification codes sent at sign-up.
+export const OTP_TTL_MINUTES = 10;
+export const MAX_OTP_ATTEMPTS = 5;
 // Per-email lockout. Counted whether or not the account exists, so the lockout
 // itself doesn't reveal which emails are registered.
 export const MAX_FAILED_LOGINS = 5;

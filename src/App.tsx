@@ -7,7 +7,7 @@ import Landing from './landing/Landing';
 
 /**
  * Signed-out visitors see the landing page; logging in or signing up (in the
- * auth modal) takes them to the dashboard. Email links (?verify, ?reset) are
+ * auth modal) takes them to the dashboard. Password-reset links (?reset) are
  * handled here so they work from either screen.
  */
 export default function App() {
@@ -18,29 +18,19 @@ export default function App() {
 
   const openAuth = useCallback((mode: AuthMode, reason?: string) => setAuthModal({ mode, reason }), []);
 
-  // Email links land on /?verify=<token> or /?reset=<token>. Strip the token from
-  // the address bar (and so from history and Referer headers) right away.
+  // Reset links land on /?reset=<token>. Strip the token from the address bar
+  // (and so from history and Referer headers) right away.
   const handledLinkRef = useRef(false);
   useEffect(() => {
     if (handledLinkRef.current) return;
     handledLinkRef.current = true;
 
-    const params = new URLSearchParams(window.location.search);
-    const verify = params.get('verify');
-    const reset = params.get('reset');
-    if (!verify && !reset) return;
+    const reset = new URLSearchParams(window.location.search).get('reset');
+    if (!reset) return;
     window.history.replaceState(null, '', window.location.pathname);
-
-    if (reset) {
-      setResetToken(reset);
-      setAuthModal({ mode: 'reset' });
-    } else if (verify) {
-      auth
-        .verifyEmail(verify)
-        .then(() => showToast('Email verified. Thanks!', 'success'))
-        .catch((err: Error) => showToast(err.message, 'error', 5000));
-    }
-  }, [auth, showToast]);
+    setResetToken(reset);
+    setAuthModal({ mode: 'reset' });
+  }, []);
 
   const onAuthenticated = useCallback(() => {
     setAuthModal(null);

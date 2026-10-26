@@ -8,7 +8,7 @@ interface UserMenuProps {
 }
 
 export function UserMenu({ onHistory, showToast }: UserMenuProps) {
-  const { status, user, logout, logoutEverywhere, resendVerification } = useAuth();
+  const { status, user, logout, logoutEverywhere } = useAuth();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -59,15 +59,6 @@ export function UserMenu({ onHistory, showToast }: UserMenuProps) {
           <div className="menu-identity">
             {user.name && <strong>{user.name}</strong>}
             <span>{user.email}</span>
-            {!user.emailVerified && (
-              <button
-                type="button"
-                className="menu-verify"
-                onClick={act(resendVerification, 'Verification email sent. Check your inbox.')}
-              >
-                Email not verified · Resend link
-              </button>
-            )}
           </div>
           <button type="button" role="menuitem" onClick={() => { setOpen(false); onHistory(); }}>History</button>
           <button type="button" role="menuitem" onClick={act(logout, 'Logged out.')}>Log out</button>

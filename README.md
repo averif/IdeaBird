@@ -42,7 +42,7 @@ The insight is signed by the server (HMAC, bound to the user, 2 h expiry), so th
 - `server/vision/`: vision analysis and OCR merge (`analyze.ts`), `ScreenshotInsight` + signing (`insight.ts`), image validation, routes
 - `src/auth/`: auth state, token handling (`client.ts`), login/signup modal, Google button
 - `server/app.ts`: the Express app (security headers, routes); `server/index.ts` runs it locally, `api/index.ts` on Vercel
-- `server/auth/`: signup/login/Google, JWT access tokens, rotating refresh tokens, password reset, email verification
+- `server/auth/`: signup/login/Google, email verification codes, JWT access tokens, rotating refresh tokens, password reset
 - `server/history/routes.ts`, `server/generate/routes.ts`: per-user generation history and the generate endpoint
 - `server/db/schema.ts`: database schema (applied automatically on first use); `server/security/rateLimit.ts`: Postgres-backed rate limits
 - `server/auth.test.ts`: integration tests for auth, token tampering, CSRF, rate limits and cross-user isolation
@@ -116,7 +116,7 @@ npm run dev
 - API runs on `http://localhost:3001`
 - Vite proxies `/api/*` to `http://localhost:3001` through `vite.config.ts`
 - The database schema is created automatically on first use (embedded PGlite or real Postgres). `npm run db:migrate` does the same up front if you prefer.
-- Password-reset and verification emails are printed to the API console unless `RESEND_API_KEY` is set.
+- Email (verification codes, password resets) goes through Resend when `RESEND_API_KEY` is set, otherwise SMTP such as Gmail when `SMTP_USER`/`SMTP_PASS` are set (see `.env.example`). With neither, emails are printed to the API console and the code step says so.
 
 ### Tests
 
@@ -124,7 +124,7 @@ npm run dev
 npm test
 ```
 
-Runs the API against an in-memory database: signup/login, lockout, token tampering, refresh-token rotation and reuse detection, CSRF checks, password reset, Google token verification, and cross-user data isolation.
+Runs the API against an in-memory database: signup/login, email verification codes, lockout, token tampering, refresh-token rotation and reuse detection, CSRF checks, password reset, Google token verification, and cross-user data isolation.
 
 ### Run only the API
 
@@ -158,7 +158,7 @@ Before the first deploy:
 1. Get a Postgres database that Vercel can reach over the internet (any provider or your own server; version 13+) and copy its connection string. If the provider offers a pooled/pgbouncer URL, use that one: serverless functions open many short connections.
 2. Add `DATABASE_URL`, `JWT_SECRET` and `APP_URL` (with `https://`) to the Vercel project's environment variables, then redeploy. Tables are created automatically on the first request. If any of these is missing, every API call answers with a message naming it.
 3. For Google sign-in, create an OAuth client ID (type "Web application") in Google Cloud Console and add your production URL (and `http://localhost:5173`) to **Authorized JavaScript origins**.
-4. For password-reset emails, create a Resend API key and verify your sending domain.
+4. Set up email: a Resend API key with your sending domain verified, or SMTP (e.g. Gmail with an App Password). **Required for email sign-up**: new accounts must enter an emailed code, so with no email provider, email sign-up is turned off in production (Google sign-in still works). It also sends password-reset emails.
 
 In Vercel, add these Environment Variables before redeploying:
 
@@ -195,7 +195,8 @@ The function's `maxDuration` is 60s (`api/index.ts`). `NVIDIA_TOTAL_TIMEOUT_MS` 
 - **Data isolation**: every history query is scoped to the authenticated user's id; another user's id returns the same 404 as an id that doesn't exist.
 - **CSRF**: cookie-authenticated endpoints also require an `X-Requested-With` header and a same-origin `Origin`. There is no CORS policy, so other sites can't call the API from the browser.
 - **Rate limits** (stored in Postgres, so they hold across serverless instances): signup, login, Google, password reset, and generation per user. 5 failed logins lock an email for 15 minutes, whether or not the account exists.
-- **Email flows**: password reset (30 min, single use, revokes all sessions) and email verification (24 h). Tokens are hashed at rest, links are built from `APP_URL` (never the request's Host header), and the token is removed from the address bar immediately.
+- **Email verification**: signing up with email sends a 6-digit code (10 min, single use); no session is issued until it's entered, and logging in to an unverified account asks for a new code. Codes are stored as HMACs keyed by the server secret, 5 wrong guesses burn the code, and sending is rate limited per address with a 30 s resend cooldown.
+- **Password reset**: single-use link (30 min) that revokes all sessions. Tokens are hashed at rest, links are built from `APP_URL` (never the request's Host header), and the token is removed from the address bar immediately.
 - **Google sign-in** verifies the ID token's signature, issuer, audience and `email_verified`. Linking Google to an existing *unverified* account drops that account's password and sessions, which blocks pre-registration account takeover.
 - **Headers**: `helmet` on the API; CSP, HSTS, `X-Frame-Options: DENY`, `nosniff`, Referrer-Policy and Permissions-Policy on the site via `vercel.json`.
 - **Input validation** with `zod`, parameterized SQL everywhere, 100 KB JSON body limit, and generic 500 responses that never leak internals.
@@ -204,7 +205,7 @@ Known trade-off: signup answers "an account with this email already exists", whi
 
 ## API
 
-Auth endpoints live under `/api/auth`: `signup`, `login`, `google`, `refresh`, `logout`, `logout-all`, `me`, `verify-email`, `resend-verification`, `forgot-password`, `reset-password`, and `config`. History: `GET /api/history`, `GET /api/history/:id`, `DELETE /api/history/:id`. All of them except the public auth ones require `Authorization: Bearer <access token>`.
+Auth endpoints live under `/api/auth`: `signup`, `login`, `google`, `refresh`, `logout`, `logout-all`, `me`, `verify-email-code`, `resend-verification-code`, `forgot-password`, `reset-password`, and `config`. History: `GET /api/history`, `GET /api/history/:id`, `DELETE /api/history/:id`. All of them except the public auth ones require `Authorization: Bearer <access token>`.
 
 ### `POST /api/analyze`
 
