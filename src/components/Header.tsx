@@ -1,16 +1,15 @@
 import type { ReactNode } from 'react';
 import type { Step } from '../types';
+import { BrandMark } from './BrandMark';
 
-export function Header({ step, children }: { step: Step; children?: ReactNode }) {
+export function Header({ step, onHome, children }: { step: Step; onHome: () => void; children?: ReactNode }) {
   return (
     <header className="header" id="header">
       <div className="header-inner">
-        <a className="brand" href="#step-upload" aria-label="IdeaBird home">
-          <span className="brand-mark" aria-hidden="true">
-            <img src="/IdeaBird.png" alt="" />
-          </span>
+        <button className="brand" type="button" onClick={onHome} aria-label="IdeaBird home">
+          <BrandMark />
           <span className="brand-name">IdeaBird</span>
-        </a>
+        </button>
         <div className="header-status" id="workflow-status" data-step={step} aria-label="Workflow">
           <span data-step-label="upload">01 Upload</span>
           <span data-step-label="insights">02 Insights</span>

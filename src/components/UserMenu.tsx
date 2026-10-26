@@ -3,13 +3,11 @@ import { useAuth } from '../auth/AuthContext';
 import type { ToastType } from '../types';
 
 interface UserMenuProps {
-  onLogin: () => void;
-  onSignup: () => void;
   onHistory: () => void;
   showToast: (message: string, type?: ToastType, duration?: number) => void;
 }
 
-export function UserMenu({ onLogin, onSignup, onHistory, showToast }: UserMenuProps) {
+export function UserMenu({ onHistory, showToast }: UserMenuProps) {
   const { status, user, logout, logoutEverywhere, resendVerification } = useAuth();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -28,16 +26,7 @@ export function UserMenu({ onLogin, onSignup, onHistory, showToast }: UserMenuPr
     };
   }, [open]);
 
-  if (status === 'loading') return <div className="user-area" aria-hidden="true" />;
-
-  if (!user) {
-    return (
-      <div className="user-area">
-        <button className="btn btn-ghost btn-sm" type="button" onClick={onLogin}>Log in</button>
-        <button className="btn btn-primary btn-sm" type="button" onClick={onSignup}>Sign up</button>
-      </div>
-    );
-  }
+  if (status !== 'authenticated' || !user) return <div className="user-area" aria-hidden="true" />;
 
   const act = (action: () => Promise<unknown>, success: string) => async () => {
     setOpen(false);

@@ -14,7 +14,10 @@
     "db:migrate": "tsx server/db/migrate.ts"
   },
   "dependencies": {
+    "@neon/config": "^1.9.4",
+    "@neon/env": "^1.6.5",
     "@vercel/analytics": "^2.0.1",
+    "@vercel/functions": "^3.10.3",
     "cookie-parser": "^1.4.7",
     "dotenv": "^16.4.7",
     "express": "^5.1.0",

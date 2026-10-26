@@ -32,7 +32,7 @@ The insight is signed by the server (HMAC, bound to the user, 2 h expiry), so th
 
 - **Client**: Vite + React + TypeScript, `tesseract.js` (lazy-loaded fallback)
 - **Server**: Node.js ESM + Express in TypeScript (run with `tsx`), `dotenv`, NVIDIA NIM OpenAI-compatible HTTP API
-- **Auth & data**: Postgres (Neon in production, embedded PGlite for local dev/tests), `jose` (JWT), Node `scrypt` password hashing, `zod` validation, `helmet`
+- **Auth & data**: Postgres (any provider in production, embedded PGlite for local dev/tests), `jose` (JWT), Node `scrypt` password hashing, `zod` validation, `helmet`
 
 ## Project Structure
 
@@ -91,7 +91,8 @@ Notes:
 Auth and database variables (see `.env.example` for details):
 
 ```env
-# Local dev: embedded Postgres, no server needed. Production: your Neon pooled URL.
+# Local dev: embedded Postgres, no server needed (or your local Postgres URL).
+# Production: any Postgres reachable from Vercel.
 DATABASE_URL=pglite:./.data/ideabird
 # At least 32 random characters:
 #   node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"
@@ -154,7 +155,7 @@ npm run preview
 
 Before the first deploy:
 
-1. Create a Neon database (or Vercel Postgres, which is Neon) and copy the **pooled** connection string.
+1. Get a Postgres database that Vercel can reach over the internet (any provider or your own server; version 13+) and copy its connection string. If the provider offers a pooled/pgbouncer URL, use that one: serverless functions open many short connections.
 2. Add `DATABASE_URL`, `JWT_SECRET` and `APP_URL` (with `https://`) to the Vercel project's environment variables, then redeploy. Tables are created automatically on the first request. If any of these is missing, every API call answers with a message naming it.
 3. For Google sign-in, create an OAuth client ID (type "Web application") in Google Cloud Console and add your production URL (and `http://localhost:5173`) to **Authorized JavaScript origins**.
 4. For password-reset emails, create a Resend API key and verify your sending domain.
@@ -172,7 +173,8 @@ NVIDIA_TIMEOUT_MS=45000
 NVIDIA_MODEL_ATTEMPTS=1
 NVIDIA_MAX_TOKENS=4096
 NVIDIA_TOTAL_TIMEOUT_MS=55000
-DATABASE_URL=postgres://...neon.tech/neondb?sslmode=require
+DATABASE_URL=postgres://USER:PASSWORD@HOST-pooler:5432/DBNAME?sslmode=require
+DATABASE_URL_UNPOOLED=postgres://USER:PASSWORD@HOST:5432/DBNAME?sslmode=require
 JWT_SECRET=<48 random bytes, base64>
 APP_URL=https://your-app.vercel.app
 GOOGLE_CLIENT_ID=<id>.apps.googleusercontent.com
@@ -180,7 +182,7 @@ RESEND_API_KEY=re_...
 MAIL_FROM=IdeaBird <noreply@yourdomain.com>
 ```
 
-`NVIDIA_API_KEY`, `DATABASE_URL`, `JWT_SECRET` and `APP_URL` are required. The rest have defaults.
+`NVIDIA_API_KEY`, `DATABASE_URL`, `JWT_SECRET` and `APP_URL` are required. The rest have defaults. With Neon, `DATABASE_URL` is the pooled (`-pooler`) URL the app uses for queries and `DATABASE_URL_UNPOOLED` the direct URL used only for schema setup; `neon env pull` writes both to `.env`.
 
 The function's `maxDuration` is 60s (`api/index.ts`). `NVIDIA_TOTAL_TIMEOUT_MS` caps moderation plus every model attempt so the API returns a JSON 504 before Vercel kills the function; it is clamped to stay under `maxDuration`. Keep `NVIDIA_TIMEOUT_MS` below it, and keep `NVIDIA_MODEL_ATTEMPTS=1` on Vercel — retries of a ~35s reasoning call don't fit in 60s.
 
