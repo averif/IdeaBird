@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>IdeaBird Terms</title>
+  <title>Terms of Use · IdeaBird</title>
+  <meta name="description" content="The terms for using IdeaBird, including our content policy and how your screenshots and data are handled." />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="icon" href="/favicon-32.png" type="image/png" sizes="32x32" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -11,81 +12,156 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Doto:wght@700&family=Geist+Mono:wght@400;500&family=Google+Sans+Flex:wght@300..700&display=swap" rel="stylesheet" />
-  <style>
-    :root {
-      color: #111111;
-      background: #fafaf9;
-      font-family: "Google Sans Flex", system-ui, sans-serif;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    body {
-      margin: 0;
-      padding: 72px 24px;
-    }
-
-    main {
-      max-width: 680px;
-      margin: 0 auto;
-    }
-
-    h1,
-    h2 {
-      margin: 0;
-      font-weight: 500;
-      letter-spacing: -0.02em;
-    }
-
-    h1 {
-      margin-bottom: 16px;
-      font-size: clamp(2rem, 5vw, 2.75rem);
-      letter-spacing: -0.035em;
-    }
-
-    h2 {
-      margin-top: 40px;
-      font-size: 1.1rem;
-    }
-
-    p,
-    li {
-      color: #5c5c5c;
-      font-size: 1rem;
-      font-weight: 300;
-      line-height: 1.75;
-    }
-
-    ul {
-      padding-left: 20px;
-    }
-
-    a {
-      color: #111111;
-      font-weight: 500;
-      text-underline-offset: 3px;
-    }
-  </style>
+  <!-- External stylesheet, not an inline <style>: the site's CSP blocks inline styles. -->
+  <link rel="stylesheet" href="/terms.css" />
 </head>
 <body>
-  <main>
-    <h1>IdeaBird Terms</h1>
-    <p>IdeaBird turns user-provided screenshot text into social content drafts. You are responsible for reviewing, editing, and verifying anything you publish.</p>
+  <header class="nav">
+    <div class="nav-inner">
+      <a class="logo" href="/" aria-label="IdeaBird home">
+        <span class="mark" aria-hidden="true">
+          <svg viewBox="-1 -2 10 10" shape-rendering="crispEdges">
+            <g fill="#fff">
+              <rect x="2" y="0" width="2" height="1" />
+              <rect x="1" y="1" width="4" height="1" />
+              <rect x="0" y="2" width="2" height="1" />
+              <rect x="3" y="2" width="3" height="1" />
+              <rect x="1" y="3" width="7" height="1" />
+              <rect x="2" y="4" width="5" height="1" />
+              <rect x="3" y="5" width="2" height="1" />
+            </g>
+          </svg>
+        </span>
+        <span>IdeaBird</span>
+      </a>
+      <a class="btn btn-primary" href="/">
+        Back to IdeaBird
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /><path d="m13 6 6 6-6 6" /></svg>
+      </a>
+    </div>
+  </header>
 
-    <h2>Content Moderation Policy</h2>
-    <p>We don't generate amplified versions of unverified political allegations or health misinformation.</p>
-    <p>IdeaBird may block generation when uploaded text appears to contain unverified allegations presented as fact, conspiracy claims, or content designed to spread misinformation.</p>
+  <main id="top">
+    <section class="hero">
+      <p class="mono kicker"><span class="dot" aria-hidden="true"></span> Legal</p>
+      <h1>Terms of use</h1>
+      <p class="lead">The rules for using IdeaBird, what we won't help create, and how your screenshots and data are handled.</p>
+      <p class="mono updated">Last updated · October 26, 2026</p>
+    </section>
 
-    <h2>Responsible Use</h2>
-    <ul>
-      <li>Do not use IdeaBird to spread false or misleading claims.</li>
-      <li>Do not present generated drafts as verified reporting without independent verification.</li>
-      <li>Do not use generated content to harass, impersonate, or mislead people.</li>
-    </ul>
+    <section class="summary" aria-labelledby="summary-title">
+      <h2 id="summary-title" class="mono">The short version</h2>
+      <ul>
+        <li><span class="n">01</span><p>IdeaBird writes <strong>drafts</strong>. Check them before you post; you're responsible for what you publish.</p></li>
+        <li><span class="n">02</span><p>We won't amplify unverified allegations, conspiracy claims or health misinformation.</p></li>
+        <li><span class="n">03</span><p>Your screenshots are analyzed and <strong>not stored</strong>. Your drafts are private to your account.</p></li>
+      </ul>
+    </section>
 
-    <h2>Generated Drafts</h2>
-    <p>Outputs are drafts, not endorsements or factual verification. Always check names, dates, claims, numbers, and context before publishing.</p>
+    <div class="layout">
+      <nav class="toc" aria-label="On this page">
+        <p class="mono">On this page</p>
+        <ol>
+          <li><a href="#service"><span>01</span> The service</a></li>
+          <li><a href="#account"><span>02</span> Your account</a></li>
+          <li><a href="#moderation"><span>03</span> Content policy</a></li>
+          <li><a href="#use"><span>04</span> Responsible use</a></li>
+          <li><a href="#drafts"><span>05</span> Generated drafts</a></li>
+          <li><a href="#data"><span>06</span> Your screenshots and data</a></li>
+          <li><a href="#changes"><span>07</span> Changes</a></li>
+        </ol>
+      </nav>
 
-    <p><a href="/">Back to IdeaBird</a></p>
+      <article class="content">
+        <section id="service">
+          <p class="mono num">01</p>
+          <h2>The service</h2>
+          <p>IdeaBird turns screenshots you upload into social content drafts. An AI model looks at the screenshot, works out what it shows and what's worth saying about it, and writes draft posts for X and LinkedIn.</p>
+          <p>You are responsible for reviewing, editing, and verifying anything you publish.</p>
+        </section>
+
+        <section id="account">
+          <p class="mono num">02</p>
+          <h2>Your account</h2>
+          <p>You need an account to analyze screenshots and generate posts. You can sign up with email, which we confirm with a one-time code, or with Google.</p>
+          <ul>
+            <li>Keep your password private. You're responsible for activity on your account.</li>
+            <li>If you think someone else has access, reset your password and use <em>Log out of all devices</em> from the account menu.</li>
+            <li>Usage is rate limited to keep the service available for everyone.</li>
+          </ul>
+        </section>
+
+        <section id="moderation">
+          <p class="mono num">03</p>
+          <h2>Content policy</h2>
+          <p>We don't generate amplified versions of unverified political allegations or health misinformation.</p>
+          <p>IdeaBird may block generation when a screenshot appears to contain unverified allegations presented as fact, conspiracy claims, or content designed to spread misinformation.</p>
+        </section>
+
+        <section id="use">
+          <p class="mono num">04</p>
+          <h2>Responsible use</h2>
+          <ul>
+            <li>Do not use IdeaBird to spread false or misleading claims.</li>
+            <li>Do not present generated drafts as verified reporting without independent verification.</li>
+            <li>Do not use generated content to harass, impersonate, or mislead people.</li>
+            <li>Only upload screenshots you have the right to use.</li>
+          </ul>
+        </section>
+
+        <section id="drafts">
+          <p class="mono num">05</p>
+          <h2>Generated drafts</h2>
+          <p>Outputs are drafts, not endorsements or factual verification. AI can misread a screenshot or get details wrong. Always check names, dates, claims, numbers, and context before publishing.</p>
+        </section>
+
+        <section id="data">
+          <p class="mono num">06</p>
+          <h2>Your screenshots and data</h2>
+          <ul>
+            <li>Screenshots are sent to our AI provider (NVIDIA) to be analyzed, then discarded. We don't store the images.</li>
+            <li>For each generation we save a short summary of what the screenshot showed and the drafts we wrote, in your private history. Only you can see it, and you can delete any item at any time.</li>
+            <li>We store your email, your name if you give it, and your password only as a secure hash, never in readable form.</li>
+          </ul>
+        </section>
+
+        <section id="changes">
+          <p class="mono num">07</p>
+          <h2>Changes</h2>
+          <p>We may update these terms as IdeaBird changes. When we do, we'll update the date at the top of this page. Continuing to use IdeaBird after a change means you accept the updated terms.</p>
+        </section>
+
+        <a class="btn btn-outline back" href="/">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
+          Back to IdeaBird
+        </a>
+      </article>
+    </div>
   </main>
+
+  <footer class="footer">
+    <a class="logo" href="/" aria-label="IdeaBird home">
+      <span class="mark small" aria-hidden="true">
+        <svg viewBox="-1 -2 10 10" shape-rendering="crispEdges">
+          <g fill="#fff">
+            <rect x="2" y="0" width="2" height="1" />
+            <rect x="1" y="1" width="4" height="1" />
+            <rect x="0" y="2" width="2" height="1" />
+            <rect x="3" y="2" width="3" height="1" />
+            <rect x="1" y="3" width="7" height="1" />
+            <rect x="2" y="4" width="5" height="1" />
+            <rect x="3" y="5" width="2" height="1" />
+          </g>
+        </svg>
+      </span>
+      <span>IdeaBird</span>
+    </a>
+    <nav aria-label="Footer">
+      <a href="/#how">How it works</a>
+      <a href="/#features">Features</a>
+      <a href="#top">Terms</a>
+    </nav>
+    <p class="mono">© 2026 IdeaBird</p>
+  </footer>
 </body>
 </html>
