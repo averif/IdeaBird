@@ -34,10 +34,21 @@ export function ResultsStep({ active, tweets, isGenerating, onRegenerate, onStar
 
   return (
     <section className={`step step-results${active ? ' active' : ''}`} id="step-results">
-      <div className="step-header compact">
-        <span className="eyebrow">Drafts</span>
-        <h2>Pick one.</h2>
-        <p className="step-desc">Click a card to copy.</p>
+      <div className="page-head">
+        <div>
+          <h2>Drafts</h2>
+          <p>Five takes on your screenshot. Click a card to copy it.</p>
+        </div>
+        <div className="page-actions">
+          <button className="btn btn-ghost btn-sm" type="button" disabled={isGenerating} onClick={onRegenerate}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 0 1-9 9 8.8 8.8 0 0 1-6-2.3" /><path d="M3 12a9 9 0 0 1 15-6.7" /><path d="M3 17v4h4" /><path d="M21 7V3h-4" /></svg>
+            Regenerate
+          </button>
+          <button className="btn btn-primary btn-sm" type="button" onClick={onStartOver}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14" /><path d="M5 12h14" /></svg>
+            New post
+          </button>
+        </div>
       </div>
       <div className="tweets-grid" id="tweets-grid">
         {tweets.map((t, i) => (
@@ -49,16 +60,6 @@ export function ResultsStep({ active, tweets, isGenerating, onRegenerate, onStar
             onCopy={() => copyTweet(t.tweet, i)}
           />
         ))}
-      </div>
-      <div className="step-actions center">
-        <button className="btn btn-ghost" id="btn-regenerate" type="button" disabled={isGenerating} onClick={onRegenerate}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 0 1-9 9 8.8 8.8 0 0 1-6-2.3" /><path d="M3 12a9 9 0 0 1 15-6.7" /><path d="M3 17v4h4" /><path d="M21 7V3h-4" /></svg>
-          Regenerate
-        </button>
-        <button className="btn btn-primary" id="btn-start-over" type="button" onClick={onStartOver}>
-          New screenshot
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14" /><path d="M5 12h14" /></svg>
-        </button>
       </div>
     </section>
   );

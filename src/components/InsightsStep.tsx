@@ -35,10 +35,11 @@ export function InsightsStep({
 
   return (
     <section className={`step step-insights${active ? ' active' : ''}`} id="step-insights">
-      <div className="step-header compact">
-        <span className="eyebrow">Insights</span>
-        <h2>Here's the story.</h2>
-        <p className="step-desc">Pick an angle, or let IdeaBird choose.</p>
+      <div className="page-head">
+        <div>
+          <h2>Insights</h2>
+          <p>What IdeaBird found. Pick an angle, or let it choose.</p>
+        </div>
       </div>
 
       <div className="extract-layout">

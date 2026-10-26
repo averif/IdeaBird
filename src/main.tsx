@@ -4,6 +4,7 @@ import { inject } from '@vercel/analytics';
 import App from './App';
 import { AuthProvider } from './auth/AuthContext';
 import './style.css';
+import './shell.css';
 
 inject();
 

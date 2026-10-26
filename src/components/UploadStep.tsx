@@ -1,4 +1,5 @@
 import { useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
+import { ChartIcon, CropIcon, ZoomIcon } from './icons';
 
 interface UploadStepProps {
   active: boolean;
@@ -37,16 +38,14 @@ export function UploadStep({ active, onFile }: UploadStepProps) {
 
   return (
     <section className={`step step-upload${active ? ' active' : ''}`} id="step-upload">
-      <div className="workspace">
-        <div className="workspace-copy">
-          <span className="eyebrow">Screenshot to posts</span>
-          <h1>
-            Turn screenshots into
-            <span className="muted">publish-ready posts.</span>
-          </h1>
-          <p className="step-desc">IdeaBird looks at your screenshot, finds the story, and writes human-sounding posts.</p>
+      <div className="page-head">
+        <div>
+          <h2>Upload a screenshot</h2>
+          <p>IdeaBird reads it, finds the story, and writes five drafts.</p>
         </div>
+      </div>
 
+      <div className="workspace">
         <div
           className={`upload-zone${dragOver ? ' drag-over' : ''}`}
           id="upload-zone"
@@ -65,10 +64,10 @@ export function UploadStep({ active, onFile }: UploadStepProps) {
               <img src="/upload.png" alt="" />
             </div>
             <div>
-              <p className="upload-text">Upload screenshot</p>
-              <p className="upload-subtext">Drag, paste, or browse.</p>
+              <p className="upload-text">Drop a screenshot here, or <span className="upload-link">browse</span></p>
+              <p className="upload-subtext">You can also paste from your clipboard.</p>
             </div>
-            <p className="upload-formats">PNG / JPG / WEBP</p>
+            <p className="upload-formats">PNG, JPG, WebP · up to 10 MB</p>
           </div>
           <input
             ref={fileInputRef}
@@ -87,11 +86,29 @@ export function UploadStep({ active, onFile }: UploadStepProps) {
         </div>
       </div>
 
-      <aside className="signal-panel" aria-label="Output overview">
-        <span>5 outputs</span>
-        <span>Reads charts &amp; UIs</span>
-        <span>Posts + thread</span>
-      </aside>
+      <ul className="tips" aria-label="Tips">
+        <li>
+          <span className="tip-icon"><CropIcon /></span>
+          <div>
+            <strong>Crop to what matters</strong>
+            <p>A tight crop around the key numbers or text gives sharper angles.</p>
+          </div>
+        </li>
+        <li>
+          <span className="tip-icon"><ChartIcon /></span>
+          <div>
+            <strong>Charts welcome</strong>
+            <p>Dashboards, graphs and product UIs are read visually, not just as text.</p>
+          </div>
+        </li>
+        <li>
+          <span className="tip-icon"><ZoomIcon /></span>
+          <div>
+            <strong>Small print is checked</strong>
+            <p>If something is hard to read, IdeaBird takes a second, closer look.</p>
+          </div>
+        </li>
+      </ul>
     </section>
   );
 }

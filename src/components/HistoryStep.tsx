@@ -1,52 +1,66 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { apiJson } from '../auth/client';
 import type { HistoryItem, HistorySummary, ToastType } from '../types';
+import { BackIcon, PlusIcon, SearchIcon, TrashIcon } from './icons';
 import { TweetCard } from './ResultsStep';
 
 interface HistoryStepProps {
   active: boolean;
+  items: HistorySummary[] | null;
+  /** Id to open (e.g. clicked in the sidebar's Recent list); null shows the list. */
+  openId: string | null;
+  onOpenChange: (id: string | null) => void;
+  onDeleted: (id: string) => void;
   onNew: () => void;
   showToast: (message: string, type?: ToastType, duration?: number) => void;
 }
 
 const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+const dayFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
 
-export function HistoryStep({ active, onNew, showToast }: HistoryStepProps) {
-  const [items, setItems] = useState<HistorySummary[] | null>(null);
+export function HistoryStep({ active, items, openId, onOpenChange, onDeleted, onNew, showToast }: HistoryStepProps) {
   const [openItem, setOpenItem] = useState<HistoryItem | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [query, setQuery] = useState('');
 
+  // Load the selected draft whenever the requested id changes.
   useEffect(() => {
-    if (!active) return;
-    setOpenItem(null);
-    apiJson<{ items: HistorySummary[] }>('/api/history')
-      .then(({ items }) => setItems(items))
-      .catch((err: Error) => {
-        setItems([]);
-        showToast(err.message, 'error');
-      });
-  }, [active, showToast]);
-
-  const open = async (id: string) => {
-    try {
-      const { item } = await apiJson<{ item: HistoryItem }>(`/api/history/${encodeURIComponent(id)}`);
-      setCopiedIndex(null);
-      setOpenItem(item);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Could not open that generation.', 'error');
+    if (!openId) {
+      setOpenItem(null);
+      return;
     }
-  };
+    if (openItem?.id === openId) return;
+    let cancelled = false;
+    apiJson<{ item: HistoryItem }>(`/api/history/${encodeURIComponent(openId)}`)
+      .then(({ item }) => {
+        if (cancelled) return;
+        setCopiedIndex(null);
+        setOpenItem(item);
+      })
+      .catch((err: Error) => {
+        if (cancelled) return;
+        showToast(err.message || 'Could not open that draft.', 'error');
+        onOpenChange(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [openId, openItem?.id, onOpenChange, showToast]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return q ? items?.filter((item) => item.preview.toLowerCase().includes(q)) ?? null : items;
+  }, [items, query]);
 
   const remove = async (id: string) => {
-    if (!window.confirm('Delete this generation? This cannot be undone.')) return;
+    if (!window.confirm('Delete this draft? This cannot be undone.')) return;
     try {
       await apiJson(`/api/history/${encodeURIComponent(id)}`, { method: 'DELETE' });
-      setItems((current) => current?.filter((item) => item.id !== id) ?? null);
-      if (openItem?.id === id) setOpenItem(null);
-      showToast('Generation deleted.', 'success');
+      onDeleted(id);
+      if (openId === id) onOpenChange(null);
+      showToast('Draft deleted.', 'success');
     } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Could not delete that generation.', 'error');
+      showToast(err instanceof Error ? err.message : 'Could not delete that draft.', 'error');
     }
   };
 
@@ -54,68 +68,97 @@ export function HistoryStep({ active, onNew, showToast }: HistoryStepProps) {
     try {
       await navigator.clipboard.writeText(text);
       setCopiedIndex(index);
-      showToast('Tweet copied to clipboard.', 'success');
+      showToast('Copied to clipboard.', 'success');
     } catch {
       showToast('Failed to copy. Please select and copy manually.', 'error');
     }
   };
 
+  const showingItem = openId && openItem?.id === openId ? openItem : null;
+
   return (
     <section className={`step step-history${active ? ' active' : ''}`} id="step-history">
-      <div className="step-header compact">
-        <span className="eyebrow">History</span>
-        <h2>{openItem ? dateFormat.format(new Date(openItem.createdAt)) : 'Your drafts.'}</h2>
-        <p className="step-desc">{openItem ? 'Click a card to copy.' : 'Only you can see these.'}</p>
-      </div>
-
-      {openItem ? (
+      {showingItem ? (
         <>
+          <div className="page-head">
+            <div>
+              <h2>{dateFormat.format(new Date(showingItem.createdAt))}</h2>
+              <p>Click a card to copy it.</p>
+            </div>
+            <div className="page-actions">
+              <button className="btn btn-ghost btn-sm" type="button" onClick={() => onOpenChange(null)}>
+                <BackIcon />
+                All drafts
+              </button>
+              <button className="btn btn-ghost btn-sm btn-danger" type="button" onClick={() => remove(showingItem.id)}>
+                <TrashIcon />
+                Delete
+              </button>
+            </div>
+          </div>
           <div className="history-source">
             <div className="panel-header">
               <span>Screenshot summary</span>
             </div>
-            <p>{openItem.sourceText}</p>
+            <p>{showingItem.sourceText}</p>
           </div>
           <div className="tweets-grid">
-            {openItem.tweets.map((t, i) => (
+            {showingItem.tweets.map((t, i) => (
               <TweetCard key={`${i}-${t.tweet}`} tweet={t} index={i} copied={copiedIndex === i} onCopy={() => copy(t.tweet, i)} />
             ))}
           </div>
-          <div className="step-actions">
-            <button className="btn btn-ghost" type="button" onClick={() => setOpenItem(null)}>
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
-              All drafts
-            </button>
-            <button className="btn btn-ghost btn-danger" type="button" onClick={() => remove(openItem.id)}>Delete</button>
-          </div>
         </>
+      ) : openId ? (
+        <p className="history-empty">Loading draft...</p>
       ) : (
         <>
-          {items === null ? (
-            <p className="history-empty">Loading...</p>
-          ) : items.length === 0 ? (
-            <p className="history-empty">No generations yet. They'll show up here after you generate posts.</p>
-          ) : (
-            <ul className="history-list">
-              {items.map((item) => (
-                <li key={item.id} className="history-row">
-                  <button type="button" className="history-open" onClick={() => open(item.id)}>
-                    <span className="history-date">{dateFormat.format(new Date(item.createdAt))}</span>
-                    <span className="history-preview">{item.preview}</span>
-                  </button>
-                  <button type="button" className="history-delete" aria-label="Delete generation" onClick={() => remove(item.id)}>
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M19 6l-1 14H6L5 6" /></svg>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="step-actions center">
-            <button className="btn btn-primary" type="button" onClick={onNew}>
-              New screenshot
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14" /><path d="M5 12h14" /></svg>
-            </button>
+          <div className="page-head">
+            <div>
+              <h2>History</h2>
+              <p>{items ? `${items.length} ${items.length === 1 ? 'draft' : 'drafts'} · only you can see these` : 'Only you can see these.'}</p>
+            </div>
+            <div className="page-actions">
+              <label className="search">
+                <SearchIcon />
+                <input type="search" placeholder="Search drafts" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search drafts" />
+              </label>
+            </div>
           </div>
+
+          {filtered === null ? (
+            <div className="table-skeleton" aria-label="Loading">
+              <span /><span /><span /><span />
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="history-empty">
+              <p>{query ? 'No drafts match your search.' : 'No drafts yet. Generate posts from a screenshot and they will appear here.'}</p>
+              {!query && (
+                <button className="btn btn-primary btn-sm" type="button" onClick={onNew}>
+                  <PlusIcon />
+                  New post
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="history-table" role="table" aria-label="Drafts">
+              <div className="history-table-head" role="row">
+                <span role="columnheader">Screenshot</span>
+                <span role="columnheader">Created</span>
+                <span role="columnheader" className="sr-only">Actions</span>
+              </div>
+              {filtered.map((item) => (
+                <div key={item.id} className="history-row" role="row">
+                  <button type="button" className="history-open" role="cell" onClick={() => onOpenChange(item.id)}>
+                    <span className="history-preview">{item.preview || 'Untitled draft'}</span>
+                    <span className="history-date">{dayFormat.format(new Date(item.createdAt))}</span>
+                  </button>
+                  <button type="button" className="history-delete" role="cell" aria-label="Delete draft" onClick={() => remove(item.id)}>
+                    <TrashIcon />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </>
       )}
     </section>

@@ -1,16 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { analyzeScreenshot, AuthRequiredError, generatePosts, refineWithOcr } from './api';
 import type { AuthMode } from './auth/AuthModal';
-import { Header } from './components/Header';
+import { apiJson } from './auth/client';
 import { HistoryStep } from './components/HistoryStep';
-import { UserMenu } from './components/UserMenu';
+import { SettingsPage } from './components/SettingsPage';
+import { Sidebar, type Page } from './components/Sidebar';
+import { StepProgress, Topbar } from './components/Topbar';
 import { UploadStep } from './components/UploadStep';
 import { InsightsStep, type AnalysisStatus } from './components/InsightsStep';
 import { ResultsStep } from './components/ResultsStep';
 import { GeneratingOverlay } from './components/GeneratingOverlay';
 import { prepareImage } from './image';
 import { recognizeText } from './ocr';
-import type { Analysis, Step, ToastType, Tweet } from './types';
+import type { Analysis, HistorySummary, ToastType, Tweet } from './types';
+
+type CreateStep = 'upload' | 'insights' | 'copy';
+const PAGE_TITLES: Record<Page, string> = { create: 'Create', history: 'History', settings: 'Settings' };
 
 const VALID_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/bmp', 'image/gif'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -23,9 +28,13 @@ interface DashboardProps {
   showToast: (message: string, type?: ToastType, duration?: number) => void;
 }
 
-/** The signed-in workspace: upload → insights → posts, plus history. */
+/** The signed-in app: a sidebar shell around Create (upload → insights → drafts), History and Settings. */
 export default function Dashboard({ openAuth, showToast }: DashboardProps) {
-  const [step, setStep] = useState<Step>('upload');
+  const [page, setPage] = useState<Page>('create');
+  const [step, setStep] = useState<CreateStep>('upload');
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [history, setHistory] = useState<HistorySummary[] | null>(null);
+  const [openHistoryId, setOpenHistoryId] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [status, setStatus] = useState<AnalysisStatus>(IDLE);
@@ -39,11 +48,47 @@ export default function Dashboard({ openAuth, showToast }: DashboardProps) {
   // Bumped on every new upload / start over so a slow analysis can't overwrite newer state.
   const runRef = useRef(0);
 
-  // --- Step Navigation ---
-  const goToStep = useCallback((next: Step) => {
+  // --- Navigation ---
+  const scrollTop = () => document.querySelector('.content-scroll')?.scrollTo({ top: 0, behavior: 'smooth' });
+
+  const goToStep = useCallback((next: CreateStep) => {
+    setPage('create');
     setStep(next);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    scrollTop();
   }, []);
+
+  const navigate = useCallback((next: Page) => {
+    setPage(next);
+    if (next === 'history') setOpenHistoryId(null);
+    setDrawerOpen(false);
+    scrollTop();
+  }, []);
+
+  const openDraft = useCallback((id: string) => {
+    setPage('history');
+    setOpenHistoryId(id);
+    setDrawerOpen(false);
+    scrollTop();
+  }, []);
+
+  // Drafts list shared by the sidebar's Recent section and the History page.
+  const loadHistory = useCallback(() => {
+    apiJson<{ items: HistorySummary[] }>('/api/history')
+      .then(({ items }) => setHistory(items))
+      .catch(() => setHistory((current) => current ?? []));
+  }, []);
+
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
+
+  // Escape closes the mobile drawer.
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setDrawerOpen(false);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [drawerOpen]);
 
   const replacePreview = useCallback((url: string | null) => {
     setPreviewUrl((previous) => {
@@ -173,6 +218,7 @@ export default function Dashboard({ openAuth, showToast }: DashboardProps) {
 
       setTweets(data.tweets);
       goToStep('copy');
+      loadHistory();
     } catch (err) {
       if (err instanceof AuthRequiredError) {
         openAuth('login', SESSION_ENDED);
@@ -185,7 +231,7 @@ export default function Dashboard({ openAuth, showToast }: DashboardProps) {
       generatingRef.current = false;
       setIsGenerating(false);
     }
-  }, [analysis, selectedAngle, goToStep, showToast, openAuth]);
+  }, [analysis, selectedAngle, goToStep, showToast, openAuth, loadHistory]);
 
   // --- Button Handlers ---
   const startOver = () => {
@@ -209,40 +255,80 @@ export default function Dashboard({ openAuth, showToast }: DashboardProps) {
     setTimeout(() => generateTweets(), 100);
   };
 
-  return (
-    <div className="app">
-      <Header step={step} onHome={startOver}>
-        <UserMenu onHistory={() => goToStep('history')} showToast={showToast} />
-      </Header>
+  const createTitleCrumb = { upload: null, insights: 'Insights', copy: 'Drafts' }[step];
+  const openDraftSummary = history?.find((item) => item.id === openHistoryId);
 
-      <main className="main" id="main">
-        <UploadStep active={step === 'upload'} onFile={handleFile} />
-        <InsightsStep
-          active={step === 'insights'}
-          previewUrl={previewUrl}
-          insight={analysis?.insight ?? null}
-          status={status}
-          selectedAngle={selectedAngle}
-          onSelectAngle={setSelectedAngle}
-          canGenerate={Boolean(analysis) && !status.active && !isGenerating}
-          onRetry={retryAnalysis}
-          onBack={() => goToStep('upload')}
-          onGenerate={generateTweets}
-        />
-        <ResultsStep
-          active={step === 'copy'}
-          tweets={tweets}
-          isGenerating={isGenerating}
-          onRegenerate={regenerate}
-          onStartOver={startOver}
-          showToast={showToast}
-        />
-        <HistoryStep active={step === 'history'} onNew={startOver} showToast={showToast} />
-        <GeneratingOverlay active={isGenerating} />
-      </main>
-      <footer className="footer">
-        <a href="/terms.html" target="_blank" rel="noreferrer">Terms</a>
-      </footer>
+  return (
+    <div className="shell">
+      <Sidebar
+        page={page}
+        onNavigate={navigate}
+        onNewPost={() => {
+          startOver();
+          setDrawerOpen(false);
+        }}
+        recent={history}
+        activeHistoryId={openHistoryId}
+        onOpenRecent={openDraft}
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        showToast={showToast}
+      />
+
+      <div className="shell-main">
+        <Topbar
+          title={PAGE_TITLES[page]}
+          crumb={
+            page === 'create'
+              ? createTitleCrumb
+              : page === 'history' && openDraftSummary
+                ? new Date(openDraftSummary.createdAt).toLocaleDateString(undefined, { dateStyle: 'medium' })
+                : null
+          }
+          onMenu={() => setDrawerOpen(true)}
+          showPasteHint={page === 'create' && step === 'upload'}
+        >
+          {page === 'create' && <StepProgress step={step} />}
+        </Topbar>
+
+        <main className="content-scroll" id="main">
+          <div className="content">
+            <UploadStep active={page === 'create' && step === 'upload'} onFile={handleFile} />
+            <InsightsStep
+              active={page === 'create' && step === 'insights'}
+              previewUrl={previewUrl}
+              insight={analysis?.insight ?? null}
+              status={status}
+              selectedAngle={selectedAngle}
+              onSelectAngle={setSelectedAngle}
+              canGenerate={Boolean(analysis) && !status.active && !isGenerating}
+              onRetry={retryAnalysis}
+              onBack={() => goToStep('upload')}
+              onGenerate={generateTweets}
+            />
+            <ResultsStep
+              active={page === 'create' && step === 'copy'}
+              tweets={tweets}
+              isGenerating={isGenerating}
+              onRegenerate={regenerate}
+              onStartOver={startOver}
+              showToast={showToast}
+            />
+            <HistoryStep
+              active={page === 'history'}
+              items={history}
+              openId={openHistoryId}
+              onOpenChange={setOpenHistoryId}
+              onDeleted={(id) => setHistory((current) => current?.filter((item) => item.id !== id) ?? null)}
+              onNew={startOver}
+              showToast={showToast}
+            />
+            <SettingsPage active={page === 'settings'} draftCount={history?.length ?? null} showToast={showToast} />
+          </div>
+        </main>
+      </div>
+
+      <GeneratingOverlay active={isGenerating} />
     </div>
   );
 }
