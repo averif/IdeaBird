@@ -1,15 +1,18 @@
 import { useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import type { ToastType } from '../types';
+import type { VoiceControls } from '../voice';
 import { DevicesIcon, LogOutIcon, MailIcon, ShieldIcon } from './icons';
+import { WriteLikeMeCard } from './WriteLikeMe';
 
 interface SettingsPageProps {
   active: boolean;
   draftCount: number | null;
+  voice: VoiceControls;
   showToast: (message: string, type?: ToastType, duration?: number) => void;
 }
 
-export function SettingsPage({ active, draftCount, showToast }: SettingsPageProps) {
+export function SettingsPage({ active, draftCount, voice, showToast }: SettingsPageProps) {
   const { user, logout, logoutEverywhere, forgotPassword } = useAuth();
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -34,7 +37,7 @@ export function SettingsPage({ active, draftCount, showToast }: SettingsPageProp
       <div className="page-head">
         <div>
           <h2>Settings</h2>
-          <p>Your account and security.</p>
+          <p>Your account, voice and security.</p>
         </div>
       </div>
 
@@ -65,6 +68,8 @@ export function SettingsPage({ active, draftCount, showToast }: SettingsPageProp
             </div>
           </dl>
         </section>
+
+        <WriteLikeMeCard controls={voice} />
 
         <section className="settings-card">
           <header>
@@ -115,8 +120,8 @@ export function SettingsPage({ active, draftCount, showToast }: SettingsPageProp
                 <strong>Your screenshots aren't stored</strong>
                 <p>Images are analyzed and discarded. Only a short summary and your drafts are saved, and you can delete them from History.</p>
               </div>
-              <a className="btn btn-ghost btn-sm" href="/terms.html" target="_blank" rel="noreferrer">
-                Read terms
+              <a className="btn btn-ghost btn-sm" href="/privacy.html" target="_blank" rel="noreferrer">
+                Privacy policy
               </a>
             </div>
           </div>

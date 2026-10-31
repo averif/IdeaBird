@@ -35,6 +35,8 @@ export interface GenerateResponse {
   id?: string;
   tweets?: Tweet[];
   model?: string;
+  /** True when the posts were written in the user's Write Like Me voice. */
+  voice?: boolean;
   error?: string;
 }
 

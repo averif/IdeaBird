@@ -129,6 +129,10 @@ export interface GenerationSource {
   insightBrief: string;
   /** Plain-text facts used to score how concrete each post is. */
   sourceText: string;
+  /** The content angle the user picked, kept separate from the facts. */
+  angle?: string | null;
+  /** Write Like Me style brief (never raw posts), or null for the default voice. */
+  voice?: string | null;
 }
 
 // budgetMs caps the whole request (every model attempt). Serverless hosts kill the
@@ -148,7 +152,7 @@ export async function generateTweetsWithFallback(
       thinking: WRITER_THINKING,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: buildUserMessage(source.insightBrief) },
+        { role: 'user', content: buildUserMessage({ insightBrief: source.insightBrief, angle: source.angle, voice: source.voice }) },
       ],
       temperature: attempt === 1 ? 0.72 : 0.64,
       maxTokens: MAX_OUTPUT_TOKENS,

@@ -121,14 +121,45 @@ Each object has:
 - "style": one of "Hot Take Tweet", "Question Tweet", "Stat-Lead Tweet", "Thread", "LinkedIn Version"
 - "tweet": the finished post-ready content`;
 
-export function buildUserMessage(insightBrief: string): string {
-  return `Do not summarize mechanically. Find the story in this screenshot and the angle that makes it worth posting.
-Infer missing context carefully, then generate the 5 requested post-ready outputs.
+export interface UserMessageInput {
+  /** What the screenshot shows: the source of truth for every fact. */
+  insightBrief: string;
+  /** The content angle the user picked, if any. */
+  angle?: string | null;
+  /** Write Like Me: how this user writes (style only), if turned on. */
+  voice?: string | null;
+}
 
-SCREENSHOT UNDERSTANDING:
+/**
+ * Three separate inputs, in priority order: screenshot facts > content angle >
+ * voice. The voice only ever shapes how things are said.
+ */
+export function buildUserMessage({ insightBrief, angle, voice }: UserMessageInput): string {
+  const sections = [
+    `Do not summarize mechanically. Find the story in this screenshot and the angle that makes it worth posting.
+Infer missing context carefully, then generate the 5 requested post-ready outputs.`,
+    `SCREENSHOT UNDERSTANDING (the facts, the source of truth):
 ---
 ${insightBrief}
----
+---`,
+  ];
 
-Return ONLY the JSON array of 5 objects.`;
+  if (angle) sections.push(`CONTENT ANGLE:
+FOCUS ANGLE: build every post around this angle: ${angle}`);
+
+  if (voice) {
+    sections.push(`VOICE PROFILE (how this person writes; style only, it contains no facts):
+---
+${voice}
+---
+Write all 5 outputs the way this person writes. Priority: facts > angle > voice.
+- The voice changes wording, rhythm, capitalization, punctuation and formatting only. It never changes, rounds or adds facts: every number, name and claim must match SCREENSHOT UNDERSTANDING exactly.
+- Keep the 5 outputs genuinely different: each takes its own angle on the story, with a different opening and a different main point. Same voice, not 5 rewrites of one post.
+- Each output's format rules (length limits, numbered thread, LinkedIn structure) still apply; when the voice conflicts with them, the format wins.
+- Sound like this person writing about something new. Don't invent personal anecdotes or experiences they didn't have.
+- No generic AI phrasing ("Here's the thing", "game-changer", "let that sink in", "in today's world", "unlock", "dive in").`);
+  }
+
+  sections.push('Return ONLY the JSON array of 5 objects.');
+  return sections.join('\n\n');
 }

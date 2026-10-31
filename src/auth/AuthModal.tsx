@@ -285,7 +285,8 @@ export function AuthModal({ mode, resetToken, reason, onModeChange, onClose, onA
         </p>
         {mode === 'signup' && (
           <p className="modal-legal">
-            By continuing you agree to the <a href="/terms.html" target="_blank" rel="noreferrer">Terms</a>.
+            By continuing you agree to the <a href="/terms.html" target="_blank" rel="noreferrer">Terms</a> and{' '}
+            <a href="/privacy.html" target="_blank" rel="noreferrer">Privacy Policy</a>.
           </p>
         )}
       </div>

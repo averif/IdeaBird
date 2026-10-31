@@ -377,6 +377,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
           <a href="#how">How it works</a>
           <a href="#features">Features</a>
           <a href="/terms.html" target="_blank" rel="noreferrer">Terms</a>
+          <a href="/privacy.html" target="_blank" rel="noreferrer">Privacy</a>
         </nav>
         <p className="lp-mono">© {new Date().getFullYear()} IdeaBird</p>
       </footer>

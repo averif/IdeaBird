@@ -61,4 +61,39 @@ CREATE TABLE IF NOT EXISTS rate_limits (
   count     integer NOT NULL,
   reset_at  timestamptz NOT NULL
 );
+
+-- Write Like Me. Pending X OAuth requests: single use, short-lived. Only the hash
+-- of the state and of the browser-binding nonce are stored.
+CREATE TABLE IF NOT EXISTS x_oauth_states (
+  state_hash     text PRIMARY KEY,
+  user_id        uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  nonce_hash     text NOT NULL,
+  code_verifier  text NOT NULL,
+  expires_at     timestamptz NOT NULL
+);
+
+-- A user's X connection. Tokens are AES-GCM encrypted and never leave the server.
+CREATE TABLE IF NOT EXISTS x_connections (
+  user_id            uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  x_user_id          text NOT NULL,
+  username           text NOT NULL,
+  access_token_enc   text NOT NULL,
+  refresh_token_enc  text,
+  expires_at         timestamptz NOT NULL,
+  status             text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'expired')),
+  created_at         timestamptz NOT NULL DEFAULT now(),
+  updated_at         timestamptz NOT NULL DEFAULT now()
+);
+
+-- How a user writes, learned once from their posts. The posts themselves are
+-- never stored: only this style profile and a few measured stats.
+CREATE TABLE IF NOT EXISTS voice_profiles (
+  user_id     uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  profile     jsonb NOT NULL,
+  post_count  integer NOT NULL,
+  enabled     boolean NOT NULL DEFAULT true,
+  model       text,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
 `;

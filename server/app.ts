@@ -6,6 +6,7 @@ import { config, ConfigError } from './config.js';
 import { generateRouter } from './generate/routes.js';
 import { historyRouter } from './history/routes.js';
 import { analyzeRouter } from './vision/routes.js';
+import { voiceRouter } from './voice/routes.js';
 import { errorHandler } from './http.js';
 
 // One Express app serves the API both locally (server/index.ts) and on Vercel
@@ -54,6 +55,7 @@ export function createApp() {
   app.use('/api/analyze', analyzeRouter);
   app.use('/api/generate', generateRouter);
   app.use('/api/history', historyRouter);
+  app.use('/api/voice', voiceRouter);
 
   app.use('/api', (_req, res) => {
     res.status(404).json({ error: 'Not found.' });

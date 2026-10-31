@@ -1,4 +1,6 @@
 import type { ScreenshotInsight } from '../types';
+import type { VoiceControls } from '../voice';
+import { VoiceToggle } from './WriteLikeMe';
 
 export interface AnalysisStatus {
   active: boolean;
@@ -17,6 +19,7 @@ interface InsightsStepProps {
   onRetry: () => void;
   onBack: () => void;
   onGenerate: () => void;
+  voice: VoiceControls;
 }
 
 export function InsightsStep({
@@ -30,6 +33,7 @@ export function InsightsStep({
   onRetry,
   onBack,
   onGenerate,
+  voice,
 }: InsightsStepProps) {
   const facts = insight ? [...insight.keyFacts, ...insight.notablePoints] : [];
 
@@ -152,10 +156,13 @@ export function InsightsStep({
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg>
           Back
         </button>
-        <button className="btn btn-primary" id="btn-generate" type="button" disabled={!canGenerate} onClick={onGenerate}>
-          Generate posts
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /><path d="m13 6 6 6-6 6" /></svg>
-        </button>
+        <div className="step-actions-end">
+          <VoiceToggle controls={voice} />
+          <button className="btn btn-primary" id="btn-generate" type="button" disabled={!canGenerate} onClick={onGenerate}>
+            Generate posts
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14" /><path d="m13 6 6 6-6 6" /></svg>
+          </button>
+        </div>
       </div>
     </section>
   );

@@ -57,6 +57,10 @@ function load() {
       process.env.MAIL_FROM ||
       (process.env.SMTP_USER && !process.env.RESEND_API_KEY ? `IdeaBird <${process.env.SMTP_USER}>` : 'IdeaBird <onboarding@resend.dev>'),
     generateLimitPerHour: Number(process.env.GENERATE_RATE_LIMIT_PER_HOUR || 30),
+    // Write Like Me: X OAuth 2.0 app (read-only). Leave X_CLIENT_ID empty to hide the feature.
+    // X_CLIENT_SECRET is set for a confidential ("Web App") client, empty for a public one.
+    xClientId: process.env.X_CLIENT_ID || '',
+    xClientSecret: process.env.X_CLIENT_SECRET || '',
   };
 }
 

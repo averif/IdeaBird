@@ -154,3 +154,28 @@ export const MailIcon = () => (
     <path d="m3 7 9 6 9-6" />
   </Icon>
 );
+
+export const PenIcon = () => (
+  <Icon size={16}>
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+  </Icon>
+);
+
+export const RefreshIcon = () => (
+  <Icon size={16}>
+    <path d="M21 12a9 9 0 0 1-15.5 6.2L3 16" />
+    <path d="M3 12a9 9 0 0 1 15.5-6.2L21 8" />
+    <path d="M21 3v5h-5" />
+    <path d="M3 21v-5h5" />
+  </Icon>
+);
+
+export const UnlinkIcon = () => (
+  <Icon size={16}>
+    <path d="M9 17H7a5 5 0 0 1 0-10h2" />
+    <path d="M15 7h2a5 5 0 0 1 4 8" />
+    <path d="M8 12h4" />
+    <path d="m3 3 18 18" />
+  </Icon>
+);

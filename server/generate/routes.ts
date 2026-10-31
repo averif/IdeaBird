@@ -7,6 +7,7 @@ import { generateTweetsWithFallback, type GenerateError } from '../generateServi
 import { HttpError, parseBody } from '../http.js';
 import { rateLimit } from '../security/rateLimit.js';
 import { insightBrief, insightToText, normalizeInsight, verifyInsight } from '../vision/insight.js';
+import { voiceForGeneration } from '../voice/store.js';
 
 export const generateRouter = Router();
 
@@ -50,9 +51,12 @@ generateRouter.post('/', requireAuth, async (req, res) => {
   }
   const angle = body.angle && insight.contentAngles.includes(body.angle) ? body.angle : null;
 
+  // Write Like Me: the stored style profile, if on. Null (default voice) on any problem.
+  const voice = await voiceForGeneration(user.id);
+
   try {
     const result = await generateTweetsWithFallback(
-      { insightBrief: insightBrief(insight, angle), sourceText: insightToText(insight) },
+      { insightBrief: insightBrief(insight), sourceText: insightToText(insight), angle, voice },
       { budgetMs: aiBudgetMs() }
     );
 
@@ -61,7 +65,7 @@ generateRouter.post('/', requireAuth, async (req, res) => {
       [user.id, insightToText(insight), JSON.stringify(result.tweets), result.model]
     );
 
-    return res.json({ status: 'ok', id: saved?.id, tweets: result.tweets, model: result.model });
+    return res.json({ status: 'ok', id: saved?.id, tweets: result.tweets, model: result.model, voice: Boolean(voice) });
   } catch (err) {
     return sendAiError(res, err as GenerateError);
   }

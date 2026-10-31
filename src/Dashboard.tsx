@@ -13,6 +13,7 @@ import { GeneratingOverlay } from './components/GeneratingOverlay';
 import { prepareImage } from './image';
 import { recognizeText } from './ocr';
 import type { Analysis, HistorySummary, ToastType, Tweet } from './types';
+import { useVoice } from './voice';
 
 type CreateStep = 'upload' | 'insights' | 'copy';
 const PAGE_TITLES: Record<Page, string> = { create: 'Create', history: 'History', settings: 'Settings' };
@@ -47,6 +48,9 @@ export default function Dashboard({ openAuth, showToast }: DashboardProps) {
   const fileRef = useRef<File | null>(null);
   // Bumped on every new upload / start over so a slow analysis can't overwrite newer state.
   const runRef = useRef(0);
+
+  // Write Like Me. Arriving back from X opens Settings, where the voice is learned.
+  const voice = useVoice(showToast, () => setPage('settings'));
 
   // --- Navigation ---
   const scrollTop = () => document.querySelector('.content-scroll')?.scrollTo({ top: 0, behavior: 'smooth' });
@@ -305,6 +309,7 @@ export default function Dashboard({ openAuth, showToast }: DashboardProps) {
               onRetry={retryAnalysis}
               onBack={() => goToStep('upload')}
               onGenerate={generateTweets}
+              voice={voice}
             />
             <ResultsStep
               active={page === 'create' && step === 'copy'}
@@ -323,7 +328,7 @@ export default function Dashboard({ openAuth, showToast }: DashboardProps) {
               onNew={startOver}
               showToast={showToast}
             />
-            <SettingsPage active={page === 'settings'} draftCount={history?.length ?? null} showToast={showToast} />
+            <SettingsPage active={page === 'settings'} draftCount={history?.length ?? null} voice={voice} showToast={showToast} />
           </div>
         </main>
       </div>

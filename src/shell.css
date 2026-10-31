@@ -820,6 +820,138 @@ a.btn {
   text-decoration: none;
 }
 
+/* --- Write Like Me --- */
+
+.voice-profile {
+  display: grid;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+}
+
+.voice-summary {
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.voice-traits {
+  display: grid;
+  gap: 6px;
+  font-size: 0.82rem;
+}
+
+.voice-traits > div {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 12px;
+}
+
+.voice-traits dt {
+  color: var(--text-muted);
+}
+
+.voice-traits dd {
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.voice-meta {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.voice-learning {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+}
+
+.voice-spinner {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--blue);
+  border-radius: 50%;
+  animation: voice-spin 800ms linear infinite;
+}
+
+@keyframes voice-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.switch {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--border-strong);
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.switch.on {
+  background: var(--blue);
+}
+
+.switch:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.switch:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.switch-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--transition);
+}
+
+.switch.on .switch-knob {
+  transform: translateX(16px);
+}
+
+.voice-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.85rem;
+}
+
+.voice-toggle strong {
+  font-weight: 500;
+}
+
+.step-actions-end {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voice-spinner {
+    animation-duration: 2400ms;
+  }
+}
+
 /* --- Responsive: the sidebar becomes a drawer --- */
 
 @media (max-width: 960px) {
@@ -923,6 +1055,11 @@ a.btn {
 
   .settings-action {
     grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .voice-traits > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
   }
 
   .settings-action > .btn {
