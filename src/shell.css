@@ -195,6 +195,70 @@
   font-size: 0.86rem;
 }
 
+.pro-features {
+  padding: 20px 22px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-panel);
+}
+
+.pro-features h3 {
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.pro-features ul {
+  margin-top: 8px;
+  list-style: none;
+}
+
+.pro-features li {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 0;
+}
+
+.pro-features li + li {
+  border-top: 1px solid var(--border);
+}
+
+.pro-features li > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.pro-features strong {
+  font-weight: 500;
+}
+
+.pro-features p {
+  margin-top: 2px;
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+}
+
+.pro-features-check {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: var(--blue);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@media (max-width: 560px) {
+  .pro-features li {
+    flex-wrap: wrap;
+  }
+
+  .pro-features li .btn {
+    margin-left: 34px;
+  }
+}
+
 .nav-pro {
   margin-left: auto;
   padding: 1px 7px;

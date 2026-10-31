@@ -403,7 +403,7 @@ export default function Dashboard({ openAuth, showToast }: DashboardProps) {
               locked={historyLocked}
               onUpgrade={() => navigate('plans')}
             />
-            <PlansPage active={page === 'plans'} initialInterval={upgradeIntent ?? undefined} showToast={showToast} />
+            <PlansPage active={page === 'plans'} initialInterval={upgradeIntent ?? undefined} onNavigate={navigate} showToast={showToast} />
             <SettingsPage active={page === 'settings'} draftCount={history?.length ?? null} voice={voice} onUpgrade={() => navigate('plans')} showToast={showToast} />
           </div>
         </main>
