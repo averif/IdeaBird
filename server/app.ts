@@ -2,9 +2,11 @@ import cookieParser from 'cookie-parser';
 import express from 'express';
 import helmet from 'helmet';
 import { authRouter } from './auth/routes.js';
+import { billingRouter } from './billing/routes.js';
 import { config, ConfigError } from './config.js';
 import { generateRouter } from './generate/routes.js';
 import { historyRouter } from './history/routes.js';
+import { preferencesRouter } from './preferences/routes.js';
 import { analyzeRouter } from './vision/routes.js';
 import { voiceRouter } from './voice/routes.js';
 import { errorHandler } from './http.js';
@@ -44,6 +46,8 @@ export function createApp() {
     next();
   });
   // Screenshots are sent as base64 to /api/analyze only; everything else stays tiny.
+  // Dodo webhook signatures are over the exact bytes sent, so that route gets the raw body.
+  app.use('/api/billing/webhook', express.raw({ type: '*/*', limit: '1mb' }));
   app.use('/api/analyze', express.json({ limit: '4.5mb' }));
   app.use(express.json({ limit: '100kb' }));
   app.use(cookieParser());
@@ -56,6 +60,8 @@ export function createApp() {
   app.use('/api/generate', generateRouter);
   app.use('/api/history', historyRouter);
   app.use('/api/voice', voiceRouter);
+  app.use('/api/billing', billingRouter);
+  app.use('/api/preferences', preferencesRouter);
 
   app.use('/api', (_req, res) => {
     res.status(404).json({ error: 'Not found.' });

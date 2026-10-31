@@ -20,6 +20,8 @@ interface InsightsStepProps {
   onBack: () => void;
   onGenerate: () => void;
   voice: VoiceControls;
+  /** e.g. "7 of 10 free generations left this month". */
+  usageNote?: string | null;
 }
 
 export function InsightsStep({
@@ -34,6 +36,7 @@ export function InsightsStep({
   onBack,
   onGenerate,
   voice,
+  usageNote = null,
 }: InsightsStepProps) {
   const facts = insight ? [...insight.keyFacts, ...insight.notablePoints] : [];
 
@@ -157,6 +160,7 @@ export function InsightsStep({
           Back
         </button>
         <div className="step-actions-end">
+          {usageNote && <span className="usage-note">{usageNote}</span>}
           <VoiceToggle controls={voice} />
           <button className="btn btn-primary" id="btn-generate" type="button" disabled={!canGenerate} onClick={onGenerate}>
             Generate posts

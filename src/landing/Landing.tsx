@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
+import { PLANS } from '../../shared/plans';
+import { rememberUpgradeIntent } from '../billing';
 import { BrandMark } from '../components/BrandMark';
+import { PricingPlans } from '../components/PricingPlans';
 import { PixelBird, PixelScreenshot } from './PixelArt';
 import './landing.css';
 
@@ -60,6 +63,10 @@ const FORMATS = [
 
 const FAQ = [
   {
+    q: 'How is IdeaBird different from ChatGPT?',
+    a: "ChatGPT is a blank box: you upload the screenshot, explain the context, write a prompt, ask for each format, then check that the numbers survived. IdeaBird is built for this one job. It reads the screenshot first, pulls out the exact metrics and the stories worth telling, and lets you pick the angle. Then it writes a post that's ready to publish. On Pro you get five at once: a hot take, a question, a stat-led post, a thread and a LinkedIn version, all saved to your history. Numbers are kept exactly as shown, and anything unclear is never stated as fact. No prompting, no copy-pasting, and no posts that sound like everyone else's AI.",
+  },
+  {
     q: 'What kind of screenshots work best?',
     a: 'Anything with a point to it: analytics dashboards, revenue charts, product launches, tweets, articles, reviews, changelogs. If a person could explain why it matters, IdeaBird can too.',
   },
@@ -74,6 +81,10 @@ const FAQ = [
   {
     q: 'Which platforms are the posts for?',
     a: 'X (as single posts and a thread) and LinkedIn. Every draft respects the platform\'s length and tone.',
+  },
+  {
+    q: 'What counts as a generation?',
+    a: `Each time you turn a screenshot into posts. Free includes ${PLANS.free.limits.generationsPerMonth} a month with one post each; Pro includes ${PLANS.pro.limits.generationsPerMonth.toLocaleString('en-US')} a month with all ${PLANS.pro.limits.draftsPerGeneration} variations.`,
   },
 ];
 
@@ -136,6 +147,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
             <a href="#how">How it works</a>
             <a href="#features">Features</a>
             <a href="#formats">Formats</a>
+            <a href="#pricing">Pricing</a>
             <a href="#faq">FAQ</a>
           </nav>
           <div className="lp-nav-actions">
@@ -333,6 +345,23 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
           </div>
         </section>
 
+        {/* --- Pricing --- */}
+        <section className="lp-section" id="pricing">
+          <div className="lp-head lp-reveal">
+            <p className="lp-mono">Pricing</p>
+            <h2>Start free. Go Pro when it clicks.</h2>
+            <p className="lp-body">Free gives you one solid post per screenshot. Pro gives you every angle, 500 generations a month, and a history of everything you've made.</p>
+          </div>
+          <PricingPlans
+            context="landing"
+            showComparison={false}
+            onSelect={(plan, interval) => {
+              if (plan === 'pro') rememberUpgradeIntent(interval);
+              onSignup();
+            }}
+          />
+        </section>
+
         {/* --- FAQ --- */}
         <section className="lp-section lp-section-narrow" id="faq">
           <div className="lp-head lp-reveal">
@@ -376,6 +405,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
         <nav aria-label="Footer">
           <a href="#how">How it works</a>
           <a href="#features">Features</a>
+          <a href="#pricing">Pricing</a>
           <a href="/terms.html" target="_blank" rel="noreferrer">Terms</a>
           <a href="/privacy.html" target="_blank" rel="noreferrer">Privacy</a>
         </nav>

@@ -179,3 +179,10 @@ export const UnlinkIcon = () => (
     <path d="m3 3 18 18" />
   </Icon>
 );
+
+export const SparkIcon = () => (
+  <Icon size={16}>
+    <path d="M12 3v4M12 17v4M3 12h4M17 12h4" />
+    <path d="m12 8 1.5 2.5L16 12l-2.5 1.5L12 16l-1.5-2.5L8 12l2.5-1.5Z" />
+  </Icon>
+);

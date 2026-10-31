@@ -8,9 +8,10 @@ export interface UserRow {
   google_sub: string | null;
   email_verified: boolean;
   token_version: number;
+  plan: 'free' | 'pro';
 }
 
-const COLUMNS = 'id, email, name, password_hash, google_sub, email_verified, token_version';
+const COLUMNS = 'id, email, name, password_hash, google_sub, email_verified, token_version, plan';
 
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();

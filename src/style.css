@@ -772,6 +772,59 @@ button.chip:hover {
   margin-top: 16px;
 }
 
+.tweet-card-bottom.with-action {
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.expand-btn {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--blue);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+  transition: background var(--transition);
+}
+
+.expand-btn:hover:not(:disabled) {
+  background: #f0f2ff;
+}
+
+.expand-btn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.expand-btn svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.expand-btn .nav-pro {
+  margin-left: 2px;
+}
+
+.expand-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--blue-soft);
+  border-top-color: var(--blue);
+  border-radius: 50%;
+  animation: spin 800ms linear infinite;
+}
+
 .copy-btn {
   min-height: 32px;
   display: inline-flex;

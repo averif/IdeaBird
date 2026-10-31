@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { analyzeScreenshot, AuthRequiredError, generatePosts, refineWithOcr } from './api';
+import { analyzeScreenshot, ApiCodeError, AuthRequiredError, expandThread, generatePosts, refineWithOcr } from './api';
+import { useAuth } from './auth/AuthContext';
 import type { AuthMode } from './auth/AuthModal';
 import { apiJson } from './auth/client';
+import { getBillingStatus, takeUpgradeIntent, useCheckoutReturn } from './billing';
 import { HistoryStep } from './components/HistoryStep';
+import { PlansPage } from './components/PlansPage';
 import { SettingsPage } from './components/SettingsPage';
 import { Sidebar, type Page } from './components/Sidebar';
 import { StepProgress, Topbar } from './components/Topbar';
@@ -12,11 +15,11 @@ import { ResultsStep } from './components/ResultsStep';
 import { GeneratingOverlay } from './components/GeneratingOverlay';
 import { prepareImage } from './image';
 import { recognizeText } from './ocr';
-import type { Analysis, HistorySummary, ToastType, Tweet } from './types';
+import type { Analysis, HistorySummary, ToastType, Tweet, Usage } from './types';
 import { useVoice } from './voice';
 
 type CreateStep = 'upload' | 'insights' | 'copy';
-const PAGE_TITLES: Record<Page, string> = { create: 'Create', history: 'History', settings: 'Settings' };
+const PAGE_TITLES: Record<Page, string> = { create: 'Create', history: 'History', plans: 'Plans', settings: 'Settings' };
 
 const VALID_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/bmp', 'image/gif'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -31,10 +34,17 @@ interface DashboardProps {
 
 /** The signed-in app: a sidebar shell around Create (upload → insights → drafts), History and Settings. */
 export default function Dashboard({ openAuth, showToast }: DashboardProps) {
-  const [page, setPage] = useState<Page>('create');
+  // Arriving from the landing page's "Upgrade to Pro" opens Plans first.
+  const [upgradeIntent] = useState(takeUpgradeIntent);
+  const [page, setPage] = useState<Page>(upgradeIntent ? 'plans' : 'create');
   const [step, setStep] = useState<CreateStep>('upload');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [history, setHistory] = useState<HistorySummary[] | null>(null);
+  // Free has no saved history (shared/plans.ts); the server says so.
+  const [historyLocked, setHistoryLocked] = useState(false);
+  const [usage, setUsage] = useState<Usage | null>(null);
+  const { user } = useAuth();
+  const plan = user?.plan ?? 'free';
   const [openHistoryId, setOpenHistoryId] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
@@ -42,12 +52,18 @@ export default function Dashboard({ openAuth, showToast }: DashboardProps) {
   const [selectedAngle, setSelectedAngle] = useState<string | null>(null);
   const [tweets, setTweets] = useState<Tweet[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
+  // The saved generation behind the current drafts (Pro), so expansions join it in History.
+  const [generationId, setGenerationId] = useState<string | null>(null);
+  const [expandingIndex, setExpandingIndex] = useState<number | null>(null);
 
   const generatingRef = useRef(false);
   // The current screenshot, kept for retries and the OCR fallback.
   const fileRef = useRef<File | null>(null);
   // Bumped on every new upload / start over so a slow analysis can't overwrite newer state.
   const runRef = useRef(0);
+
+  // Back from Dodo checkout: confirm the subscription, then show Plans.
+  useCheckoutReturn(showToast, () => setPage('plans'));
 
   // Write Like Me. Arriving back from X opens Settings, where the voice is learned.
   const voice = useVoice(showToast, () => setPage('settings'));
@@ -77,14 +93,21 @@ export default function Dashboard({ openAuth, showToast }: DashboardProps) {
 
   // Drafts list shared by the sidebar's Recent section and the History page.
   const loadHistory = useCallback(() => {
-    apiJson<{ items: HistorySummary[] }>('/api/history')
-      .then(({ items }) => setHistory(items))
+    apiJson<{ items: HistorySummary[]; locked?: boolean }>('/api/history')
+      .then(({ items, locked }) => {
+        setHistory(items);
+        setHistoryLocked(Boolean(locked));
+      })
       .catch(() => setHistory((current) => current ?? []));
   }, []);
 
   useEffect(() => {
     loadHistory();
-  }, [loadHistory]);
+    getBillingStatus()
+      .then((billing) => setUsage(billing.usage))
+      .catch(() => {});
+    // Reload when the plan changes (e.g. right after upgrading).
+  }, [loadHistory, plan]);
 
   // Escape closes the mobile drawer.
   useEffect(() => {
@@ -221,11 +244,19 @@ export default function Dashboard({ openAuth, showToast }: DashboardProps) {
       }
 
       setTweets(data.tweets);
+      setGenerationId(data.id ?? null);
+      if (data.usage) setUsage(data.usage);
       goToStep('copy');
       loadHistory();
     } catch (err) {
       if (err instanceof AuthRequiredError) {
         openAuth('login', SESSION_ENDED);
+        return;
+      }
+      if (err instanceof ApiCodeError && err.code === 'limit_reached') {
+        // Out of generations this month: show what Pro offers.
+        showToast(err.message, 'error', 8000);
+        setPage('plans');
         return;
       }
       console.error('Generate error:', err);
@@ -236,6 +267,38 @@ export default function Dashboard({ openAuth, showToast }: DashboardProps) {
       setIsGenerating(false);
     }
   }, [analysis, selectedAngle, goToStep, showToast, openAuth, loadHistory]);
+
+  // --- Thread expansion (Pro) ---
+  const expandIntoThread = useCallback(
+    async (index: number) => {
+      const source = tweets[index];
+      if (!analysis || !source || expandingIndex !== null) return;
+      setExpandingIndex(index);
+      try {
+        const data = await expandThread(analysis, source.tweet, generationId);
+        if (!data.tweet) throw new Error('IdeaBird did not receive a thread.');
+        const thread = data.tweet;
+        // Show it right after the post it came from.
+        setTweets((current) => [...current.slice(0, index + 1), thread, ...current.slice(index + 1)]);
+        if (data.usage) setUsage(data.usage);
+        showToast('Thread ready. Click it to copy.', 'success');
+      } catch (err) {
+        if (err instanceof AuthRequiredError) {
+          openAuth('login', SESSION_ENDED);
+          return;
+        }
+        if (err instanceof ApiCodeError && err.code === 'limit_reached') {
+          showToast(err.message, 'error', 8000);
+          setPage('plans');
+          return;
+        }
+        showToast(err instanceof Error ? err.message : 'Could not write the thread. Please try again.', 'error', 6000);
+      } finally {
+        setExpandingIndex(null);
+      }
+    },
+    [tweets, analysis, generationId, expandingIndex, showToast, openAuth]
+  );
 
   // --- Button Handlers ---
   const startOver = () => {
@@ -272,6 +335,7 @@ export default function Dashboard({ openAuth, showToast }: DashboardProps) {
           setDrawerOpen(false);
         }}
         recent={history}
+        recentLocked={historyLocked}
         activeHistoryId={openHistoryId}
         onOpenRecent={openDraft}
         open={drawerOpen}
@@ -310,6 +374,11 @@ export default function Dashboard({ openAuth, showToast }: DashboardProps) {
               onBack={() => goToStep('upload')}
               onGenerate={generateTweets}
               voice={voice}
+              usageNote={
+                plan === 'free' && usage
+                  ? `${Math.max(0, usage.limit - usage.used)} of ${usage.limit} free generations left this month`
+                  : null
+              }
             />
             <ResultsStep
               active={page === 'create' && step === 'copy'}
@@ -318,6 +387,10 @@ export default function Dashboard({ openAuth, showToast }: DashboardProps) {
               onRegenerate={regenerate}
               onStartOver={startOver}
               showToast={showToast}
+              onUpgrade={plan === 'free' ? () => navigate('plans') : undefined}
+              onExpand={expandIntoThread}
+              expandLocked={plan === 'free'}
+              expandingIndex={expandingIndex}
             />
             <HistoryStep
               active={page === 'history'}
@@ -327,8 +400,11 @@ export default function Dashboard({ openAuth, showToast }: DashboardProps) {
               onDeleted={(id) => setHistory((current) => current?.filter((item) => item.id !== id) ?? null)}
               onNew={startOver}
               showToast={showToast}
+              locked={historyLocked}
+              onUpgrade={() => navigate('plans')}
             />
-            <SettingsPage active={page === 'settings'} draftCount={history?.length ?? null} voice={voice} showToast={showToast} />
+            <PlansPage active={page === 'plans'} initialInterval={upgradeIntent ?? undefined} showToast={showToast} />
+            <SettingsPage active={page === 'settings'} draftCount={history?.length ?? null} voice={voice} onUpgrade={() => navigate('plans')} showToast={showToast} />
           </div>
         </main>
       </div>

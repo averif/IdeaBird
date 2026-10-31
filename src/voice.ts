@@ -36,7 +36,14 @@ export function useVoice(showToast: (message: string, type?: ToastType, duration
   const [learning, setLearning] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const load = useCallback(() => apiJson<VoiceStatus>('/api/voice').then(setVoice).catch(() => {}), []);
+  // { hidden: true } while the feature is switched off on the server: render nothing.
+  const load = useCallback(
+    () =>
+      apiJson<VoiceStatus | { hidden: true }>('/api/voice')
+        .then((status) => setVoice('hidden' in status ? null : status))
+        .catch(() => {}),
+    []
+  );
 
   const learn = useCallback(async () => {
     setLearning(true);

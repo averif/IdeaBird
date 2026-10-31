@@ -107,6 +107,12 @@ async function api(method: string, path: string, token?: string, body?: unknown)
   return { status: res.status, data: await res.json().catch(() => ({})) };
 }
 
+/** Five drafts and saved history are Pro; most pipeline tests check those. */
+async function makePro(token: string) {
+  const { sub } = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString());
+  await query(`UPDATE users SET plan = 'pro' WHERE id = $1`, [sub]);
+}
+
 let n = 0;
 /** Signs up and enters the emailed code (the dev mailer prints it to the console). */
 async function signup() {
@@ -148,6 +154,7 @@ describe('vision-first pipeline', () => {
 
   test('the writer receives the structured insight (and chosen angle), not raw text', async () => {
     const token = await signup();
+    await makePro(token);
     const analysis = await api('POST', '/api/analyze', token, { image: PNG });
     calls = [];
     const r = await api('POST', '/api/generate', token, {

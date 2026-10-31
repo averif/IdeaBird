@@ -13,6 +13,14 @@ import { buildAuthorizeUrl, exchangeCode, fetchRecentPosts, getMe, randomToken, 
 
 export const voiceRouter = Router();
 
+// While Write Like Me is hidden (WRITE_LIKE_ME isn't "on"), the status call tells
+// the app to hide it and every other endpoint doesn't exist.
+voiceRouter.use((req, res, next) => {
+  if (config().writeLikeMe) return next();
+  if (req.method === 'GET' && req.path === '/') return res.json({ hidden: true });
+  return res.status(404).json({ error: 'Not found.' });
+});
+
 const STATE_TTL_MINUTES = 10;
 // Binds the OAuth round trip to the browser that started it, so a victim can't be
 // tricked into finishing someone else's authorization (and connecting their X
@@ -130,7 +138,15 @@ function sendVoiceError(res: Response, err: unknown) {
     return res.status(409).json({ code: 'reconnect', error: VOICE_MESSAGES.reconnect });
   }
   if (err instanceof XApiError) {
-    console.error(`[IdeaBird] X API error: ${err.kind}`);
+    // err.message holds the endpoint and HTTP status only (no tokens, no post text).
+    console.error(`[IdeaBird] X API error (${err.kind}): ${err.message}`);
+    if (err.kind === 'no_credits') {
+      console.error('[IdeaBird] The X developer account has no API credits left. Add credits at https://developer.x.com to re-enable Write Like Me.');
+      return res.status(503).json({
+        code: 'x_no_credits',
+        error: "Write Like Me can't read posts from X right now. It's a temporary limit on IdeaBird's side, not your account. Your posts still use IdeaBird's default voice.",
+      });
+    }
     if (err.kind === 'rate_limited') {
       const minutes = err.resetAt ? Math.max(1, Math.ceil((err.resetAt - Date.now()) / 60000)) : 15;
       res.set('Retry-After', String(minutes * 60));

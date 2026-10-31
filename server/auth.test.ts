@@ -282,6 +282,8 @@ describe('data isolation', () => {
   test("a user can't list, read, or delete another user's generations", async () => {
     const alice = await signup();
     const bob = await signup();
+    // History is a Pro feature; isolation must hold where it's available.
+    await query(`UPDATE users SET plan = 'pro' WHERE id = ANY($1)`, [[alice.id, bob.id]]);
     const [gen] = await query<{ id: string }>(
       `INSERT INTO generations (user_id, source_text, tweets) VALUES ($1, 'alice secret', '[]') RETURNING id`,
       [alice.id]
@@ -304,6 +306,7 @@ describe('data isolation', () => {
 
   test('malformed ids and SQL-looking input are handled safely', async () => {
     const u = await signup();
+    await query(`UPDATE users SET plan = 'pro' WHERE id = $1`, [u.id]);
     assert.equal((await api('GET', `/api/history/${encodeURIComponent("1' OR '1'='1")}`, { token: u.token })).status, 404);
     const r = await api('POST', '/api/auth/login', { body: { email: "x'--@example.com", password: "' OR 1=1 --" } });
     assert.equal(r.status, 401);
@@ -427,5 +430,17 @@ describe('email verification code', () => {
     );
     assert.ok(rows.length > 0);
     assert.ok(rows.every((r) => !r.token_hash.includes(code) && r.token_hash.length === 64));
+  });
+});
+
+describe('Write Like Me while hidden', () => {
+  test('is hidden and its endpoints do not exist unless WRITE_LIKE_ME=on', async () => {
+    const u = await signup();
+    const status = await api('GET', '/api/voice', { token: u.token });
+    assert.equal(status.status, 200);
+    assert.deepEqual(status.data, { hidden: true });
+    for (const [method, path] of [['POST', '/api/voice/connect'], ['POST', '/api/voice/refresh'], ['PATCH', '/api/voice'], ['DELETE', '/api/voice'], ['GET', '/api/voice/x/callback']]) {
+      assert.equal((await api(method, path, { token: u.token, body: method === 'PATCH' ? { enabled: true } : undefined })).status, 404, `${method} ${path}`);
+    }
   });
 });

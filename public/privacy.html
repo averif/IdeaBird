@@ -46,7 +46,7 @@
       <p class="mono kicker"><span class="dot" aria-hidden="true"></span> Legal</p>
       <h1>Privacy policy</h1>
       <p class="lead">What IdeaBird collects, why, who handles it for us, how long we keep it, and how you can delete it.</p>
-      <p class="mono updated">Last updated · October 31, 2026</p>
+      <p class="mono updated">Last updated · October 31, 2026 (billing added)</p>
     </section>
 
     <section class="summary" aria-labelledby="summary-title">
@@ -85,7 +85,8 @@
             <li><strong>Sessions:</strong> for each signed-in device we keep a hashed session token, your browser's user agent and your IP address. This keeps you signed in and helps us spot misuse.</li>
             <li><strong>Your history:</strong> a short summary of each screenshot and the drafts IdeaBird wrote for it.</li>
             <li><strong>Write Like Me</strong>, only if you connect X: see section 03.</li>
-            <li><strong>Usage counts:</strong> short-lived counters per account, IP address or email, used for rate limits and to block repeated failed logins.</li>
+            <li><strong>Usage counts:</strong> how many posts you generated this month, so we can apply your plan's limit, plus short-lived counters per account, IP address or email for rate limits and to block repeated failed logins.</li>
+            <li><strong>Billing</strong> (only if you subscribe to Pro): your plan, billing period, subscription status, renewal date, and the customer and subscription IDs from our payment provider. <strong>We never see or store your card or bank details;</strong> the payment provider handles them.</li>
           </ul>
         </section>
 
@@ -95,7 +96,7 @@
           <ul>
             <li>When you upload a screenshot, it's sent to our AI provider (NVIDIA) to be analyzed, then discarded. We don't store the image.</li>
             <li>If small text is hard to read, IdeaBird may run text recognition <strong>in your browser</strong>. That text is sent along with the analysis and isn't stored on its own.</li>
-            <li>Only the summary and the drafts are saved, in your private history. Nobody else can see them, and you can delete any item from History.</li>
+            <li>On Pro, the summary and the drafts are saved in your private history. Nobody else can see them, and you can delete any item from History. On Free, drafts aren't saved.</li>
           </ul>
         </section>
 
@@ -120,6 +121,7 @@
           <ul>
             <li>To run IdeaBird: sign you in, analyze screenshots, write drafts and show your history.</li>
             <li>To send account emails: verification codes and password reset links. No marketing emails.</li>
+            <li>To run your subscription: apply your plan, show your billing status, and keep it in sync with the payment provider.</li>
             <li>To keep IdeaBird safe: rate limits, blocking abuse, and detecting stolen sessions.</li>
           </ul>
           <p>We don't sell your data or use it for advertising. We don't use your screenshots, drafts or X posts to train AI models.</p>
@@ -134,6 +136,7 @@
             <li><strong>Vercel</strong> (hosting) runs the app and gives us privacy-friendly, aggregated page analytics without advertising cookies.</li>
             <li><strong>Neon</strong> (database) stores your account, history, encrypted X tokens and voice profile.</li>
             <li><strong>Email delivery</strong> (Resend, or Google's Gmail) sends verification codes and reset links.</li>
+            <li><strong>Dodo Payments</strong> (payments) processes Pro subscriptions as our merchant of record. It collects your payment details, billing address and email at checkout, charges you, handles taxes and invoices, and runs the billing portal. Its own privacy policy applies to that data.</li>
             <li><strong>Google</strong>, only if you choose Google sign-in.</li>
             <li><strong>X</strong>, only if you connect it for Write Like Me.</li>
           </ul>
@@ -155,7 +158,8 @@
           <h2>Retention and deletion</h2>
           <ul>
             <li><strong>Screenshots and X posts:</strong> not stored. They're discarded after processing.</li>
-            <li><strong>History:</strong> kept until you delete it.</li>
+            <li><strong>History:</strong> kept until you delete it. If you move from Pro to Free, saved drafts stay in your account, hidden, and come back if you upgrade again.</li>
+            <li><strong>Billing records:</strong> we keep your plan and subscription details while you have an account. Dodo Payments keeps payment and invoice records as tax and accounting law requires.</li>
             <li><strong>Voice profile and X tokens:</strong> kept until you disconnect X or delete your account.</li>
             <li><strong>Sessions:</strong> end after 30 days, or sooner when you log out or use <em>Log out of all devices</em>.</li>
             <li><strong>Verification codes and reset links:</strong> expire within minutes and work only once.</li>

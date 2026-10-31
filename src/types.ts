@@ -37,7 +37,22 @@ export interface GenerateResponse {
   model?: string;
   /** True when the posts were written in the user's Write Like Me voice. */
   voice?: boolean;
+  usage?: Usage;
   error?: string;
+}
+
+export interface ThreadResponse {
+  status?: 'ok';
+  tweet?: Tweet;
+  usage?: Usage;
+  error?: string;
+}
+
+/** Generations used this month against the plan's allowance. */
+export interface Usage {
+  used: number;
+  limit: number;
+  resetsAt: string;
 }
 
 export interface User {
@@ -47,6 +62,7 @@ export interface User {
   emailVerified: boolean;
   hasPassword: boolean;
   googleLinked: boolean;
+  plan: 'free' | 'pro';
 }
 
 export interface HistorySummary {

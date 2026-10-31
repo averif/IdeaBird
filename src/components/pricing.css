@@ -1,0 +1,550 @@
+/* ============================================
+   Pricing: plan cards + comparison. Used on the landing page and in the app,
+   so it relies only on the global tokens (style.css), not lp-* or shell styles.
+   ============================================ */
+
+.pr {
+  display: grid;
+  gap: 28px;
+}
+
+.pr-mono {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+/* --- Billing line --- */
+
+.pr-billing {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.pr-billing-pill {
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  color: var(--text-inverse);
+  background: var(--bg-ink);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Monthly / Yearly switch with a sliding ink thumb. */
+.pr-toggle {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--bg-subtle);
+}
+
+.pr-toggle-thumb {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc(50% - 4px);
+  border-radius: var(--radius-pill);
+  background: var(--bg-ink);
+  transition: transform 280ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.pr-toggle[data-interval='year'] .pr-toggle-thumb {
+  transform: translateX(100%);
+}
+
+.pr-toggle-opt {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: color 200ms ease;
+}
+
+.pr-toggle-opt.active {
+  color: var(--text-inverse);
+}
+
+.pr-toggle-opt:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.pr-save {
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  color: var(--text-inverse);
+  background: var(--blue);
+  font-size: 0.7rem;
+}
+
+/* --- Cards --- */
+
+.pr-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: stretch;
+}
+
+.pr-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 28px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--bg-panel);
+  transition: border-color var(--transition), box-shadow 240ms ease, transform 240ms ease;
+}
+
+.pr-card:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-2px);
+}
+
+.pr-card-featured {
+  border-color: var(--blue);
+  box-shadow: 0 24px 60px -36px rgba(0, 0, 255, 0.45);
+}
+
+.pr-card-featured:hover {
+  border-color: var(--blue);
+  box-shadow: 0 30px 70px -34px rgba(0, 0, 255, 0.55);
+}
+
+/* Dot-matrix corner accent, from the brand's pixel motif. */
+.pr-card-featured::after {
+  content: '';
+  position: absolute;
+  top: 22px;
+  right: 22px;
+  width: 30px;
+  height: 30px;
+  background-image: radial-gradient(var(--blue-soft) 1.6px, transparent 1.8px);
+  background-size: 7.5px 7.5px;
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.pr-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-right: 40px;
+}
+
+.pr-card h3 {
+  font-size: 1.15rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.pr-tag {
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  color: var(--text-inverse);
+  background: var(--blue);
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+
+.pr-tag-muted {
+  color: var(--text-secondary);
+  background: var(--bg-subtle);
+}
+
+.pr-tagline {
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+}
+
+.pr-price {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 22px;
+}
+
+.pr-amount {
+  font-size: clamp(2.6rem, 5vw, 3.4rem);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: -0.04em;
+}
+
+.pr-amount {
+  animation: pr-swap 320ms ease both;
+}
+
+.pr-per {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+.pr-was {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+@keyframes pr-swap {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.pr-price-note {
+  margin-bottom: 22px;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+}
+
+.pr-card-featured .pr-price-note {
+  color: var(--blue);
+}
+
+/* --- Buttons --- */
+
+.pr-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  height: 50px;
+  padding: 0 22px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background var(--transition), border-color var(--transition), color var(--transition), transform var(--transition);
+}
+
+.pr-btn:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.pr-btn:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 3px;
+}
+
+.pr-btn:disabled {
+  cursor: default;
+}
+
+.pr-btn-primary {
+  color: #fff;
+  background: var(--blue);
+}
+
+.pr-btn-primary:hover:not(:disabled) {
+  background: var(--blue-hover);
+}
+
+.pr-btn-primary:disabled {
+  opacity: 0.7;
+}
+
+.pr-btn-outline {
+  color: var(--text-primary);
+  border-color: var(--border);
+  background: var(--bg-panel);
+}
+
+.pr-btn-outline:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--bg-surface);
+}
+
+.pr-btn-outline:disabled {
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+}
+
+.pr-btn-square {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  background: #fff;
+}
+
+.pr-arrow {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform var(--transition);
+}
+
+.pr-btn:hover:not(:disabled) .pr-arrow {
+  transform: translateX(3px);
+}
+
+/* --- Feature list --- */
+
+.pr-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 24px;
+  padding-top: 22px;
+  border-top: 1px solid var(--border);
+  list-style: none;
+  font-size: 0.93rem;
+}
+
+.pr-list li {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  line-height: 1.4;
+}
+
+.pr-soon {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  background: var(--bg-subtle);
+  font-size: 0.72rem;
+  font-weight: 500;
+  white-space: nowrap;
+  vertical-align: 1px;
+}
+
+.pr-cell .pr-soon {
+  margin-left: 0;
+}
+
+.pr-list li.pr-off {
+  color: var(--text-muted);
+}
+
+.pr-icon {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.pr-yes {
+  stroke: var(--blue);
+}
+
+.pr-no {
+  stroke: var(--text-tertiary);
+}
+
+/* --- Comparison --- */
+
+.pr-compare {
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--bg-panel);
+  overflow: hidden;
+}
+
+.pr-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) repeat(2, minmax(0, 1fr));
+  align-items: center;
+  gap: 16px;
+  padding: 14px 24px;
+  font-size: 0.92rem;
+}
+
+.pr-row + .pr-row {
+  border-top: 1px solid var(--border);
+}
+
+.pr-row-head {
+  padding-top: 16px;
+  padding-bottom: 16px;
+  background: var(--bg-subtle);
+  font-weight: 500;
+}
+
+.pr-row-label small {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.pr-cell {
+  display: flex;
+  align-items: center;
+  color: var(--text-secondary);
+}
+
+.pr-row-head .pr-col-featured,
+.pr-cell.pr-col-featured {
+  color: var(--blue);
+}
+
+.pr-cell.pr-col-featured {
+  font-weight: 500;
+}
+
+/* --- Entrance: cards rise, then their checks follow --- */
+
+.pr-card,
+.pr-compare,
+.pr-billing {
+  opacity: 0;
+  transform: translateY(16px);
+}
+
+.pr.in .pr-billing,
+.pr.in .pr-card,
+.pr.in .pr-compare {
+  animation: pr-rise 650ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.pr.in .pr-card {
+  animation-delay: calc(80ms + var(--pr-delay, 0ms));
+}
+
+.pr.in .pr-compare {
+  animation-delay: 280ms;
+}
+
+.pr.in .pr-list li {
+  animation: pr-fade 420ms ease both;
+  animation-delay: calc(320ms + var(--pr-delay, 0ms) + var(--pr-i, 0) * 50ms);
+}
+
+@keyframes pr-rise {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pr-fade {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* --- Responsive --- */
+
+@media (max-width: 760px) {
+  .pr-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* The featured plan leads on phones. */
+  .pr-card-featured {
+    order: -1;
+  }
+
+  .pr-card {
+    padding: 24px 20px;
+  }
+}
+
+@media (max-width: 560px) {
+  .pr-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 6px 12px;
+    padding: 14px 16px;
+  }
+
+  .pr-row-label {
+    grid-column: 1 / -1;
+    font-weight: 500;
+  }
+
+  .pr-row-head > :first-child {
+    display: none;
+  }
+
+  /* Inline flow, so a long value wraps under its plan label, not beside it. */
+  .pr-cell {
+    display: block;
+  }
+
+  .pr-cell .pr-icon {
+    vertical-align: -5px;
+  }
+
+  /* Without the header column in view, name each value's plan. */
+  .pr-cell::before {
+    content: attr(data-plan) ': ';
+    margin-right: 4px;
+    color: var(--text-muted);
+    font-weight: 400;
+  }
+
+  .pr-row-head {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pr-card,
+  .pr-compare,
+  .pr-billing,
+  .pr-list li {
+    opacity: 1;
+    transform: none;
+    animation: none !important;
+  }
+
+  .pr-card:hover {
+    transform: none;
+  }
+
+  .pr-amount {
+    animation: none;
+  }
+
+  .pr-toggle-thumb {
+    transition: none;
+  }
+}

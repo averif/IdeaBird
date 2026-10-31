@@ -8,6 +8,11 @@ import { HttpError, parseBody } from '../http.js';
 import { rateLimit } from '../security/rateLimit.js';
 import { insightBrief, insightToText, normalizeInsight, verifyInsight } from '../vision/insight.js';
 import { voiceForGeneration } from '../voice/store.js';
+import { preferencesForGeneration } from '../preferences/routes.js';
+import { PLANS, type Plan } from '../../shared/plans.js';
+import type { UserRow } from '../auth/users.js';
+import { expandToThread, THREAD_STYLE } from './thread.js';
+import { releaseGeneration, reserveGeneration, usageFor } from '../billing/usage.js';
 
 export const generateRouter = Router();
 
@@ -51,24 +56,118 @@ generateRouter.post('/', requireAuth, async (req, res) => {
   }
   const angle = body.angle && insight.contentAngles.includes(body.angle) ? body.angle : null;
 
-  // Write Like Me: the stored style profile, if on. Null (default voice) on any problem.
-  const voice = await voiceForGeneration(user.id);
+  // Plan allowance (shared/plans.ts): claimed before the AI call, given back if it fails.
+  const plan = PLANS[user.plan] ?? PLANS.free;
+  if ((await reserveGeneration(user.id, plan.id)) === null) return limitReached(res, user, plan);
 
+  // Write Like Me: the stored style profile, if on. Null (default voice) on any problem.
+  const voice = config().writeLikeMe ? await voiceForGeneration(user.id) : null;
+  // Pro: tone and standing instructions. Null when not Pro or nothing is set.
+  const preferences = await preferencesForGeneration(user);
+
+  let result;
   try {
-    const result = await generateTweetsWithFallback(
-      { insightBrief: insightBrief(insight), sourceText: insightToText(insight), angle, voice },
+    result = await generateTweetsWithFallback(
+      { insightBrief: insightBrief(insight), sourceText: insightToText(insight), angle, voice, preferences },
       { budgetMs: aiBudgetMs() }
     );
-
-    const [saved] = await query<{ id: string }>(
-      `INSERT INTO generations (user_id, source_text, tweets, model) VALUES ($1, $2, $3, $4) RETURNING id`,
-      [user.id, insightToText(insight), JSON.stringify(result.tweets), result.model]
-    );
-
-    return res.json({ status: 'ok', id: saved?.id, tweets: result.tweets, model: result.model, voice: Boolean(voice) });
   } catch (err) {
+    await releaseGeneration(user.id).catch(() => {});
     return sendAiError(res, err as GenerateError);
   }
+
+  // Free gets the single default post; Pro gets every variation.
+  const tweets = result.tweets.slice(0, plan.limits.draftsPerGeneration);
+
+  // Only plans with history keep generations.
+  const [saved] = plan.limits.history
+    ? await query<{ id: string }>(
+        `INSERT INTO generations (user_id, source_text, tweets, model) VALUES ($1, $2, $3, $4) RETURNING id`,
+        [user.id, insightToText(insight), JSON.stringify(tweets), result.model]
+      )
+    : [];
+
+  return res.json({
+    status: 'ok',
+    id: saved?.id,
+    tweets,
+    model: result.model,
+    voice: Boolean(voice),
+    plan: plan.id,
+    usage: await usageFor(user.id, plan.id),
+  });
+});
+
+/** 402 when this month's generations are used up. */
+async function limitReached(res: Response, user: UserRow, plan: Plan) {
+  const usage = await usageFor(user.id, plan.id);
+  const resets = new Date(usage.resetsAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' });
+  return res.status(402).json({
+    code: 'limit_reached',
+    error:
+      plan.id === 'free'
+        ? `You've used all ${usage.limit} free generations this month. Upgrade to Pro for ${PLANS.pro.limits.generationsPerMonth.toLocaleString('en-US')} a month, or wait until ${resets}.`
+        : `You've used all ${usage.limit.toLocaleString('en-US')} generations this month. Your allowance resets on ${resets}.`,
+    usage,
+  });
+}
+
+/**
+ * Pro: expand one post into a full X thread. Grounded in the same signed
+ * insight as the original generation, so it can only use the screenshot's
+ * facts. Counts as one generation; added to the saved generation if given.
+ */
+generateRouter.post('/thread', requireAuth, async (req, res) => {
+  const user = currentUser(req);
+  const plan = PLANS[user.plan] ?? PLANS.free;
+  if (!plan.limits.threadExpansion) {
+    throw new HttpError(403, 'Thread expansion is part of IdeaBird Pro.');
+  }
+  await rateLimit({
+    key: `generate:${user.id}`,
+    max: config().generateLimitPerHour,
+    windowSeconds: 60 * 60,
+    message: 'You have reached the hourly generation limit. Try again later.',
+  });
+
+  const body = parseBody(
+    z.object({
+      insight: z.unknown(),
+      insightToken: z.string().max(200),
+      post: z.string().trim().min(1).max(3000),
+      generationId: z.uuid().nullish(),
+    }),
+    req.body
+  );
+  const insight = normalizeInsight(body.insight);
+  if (!verifyInsight(user.id, insight, body.insightToken)) {
+    throw new HttpError(403, 'This analysis has expired. Upload the screenshot again.');
+  }
+
+  if ((await reserveGeneration(user.id, plan.id)) === null) return limitReached(res, user, plan);
+
+  const voice = config().writeLikeMe ? await voiceForGeneration(user.id) : null;
+  const preferences = await preferencesForGeneration(user);
+
+  let thread;
+  try {
+    thread = await expandToThread({ insightBrief: insightBrief(insight), post: body.post, preferences, voice }, { budgetMs: aiBudgetMs() });
+  } catch (err) {
+    await releaseGeneration(user.id).catch(() => {});
+    return sendAiError(res, err as GenerateError);
+  }
+
+  const tweet = { style: THREAD_STYLE, tweet: thread.tweet };
+  // Keep it with the original drafts in History (scoped to this user's own row).
+  if (body.generationId && plan.limits.history) {
+    await query(`UPDATE generations SET tweets = tweets || $3::jsonb WHERE id = $1 AND user_id = $2`, [
+      body.generationId,
+      user.id,
+      JSON.stringify([tweet]),
+    ]);
+  }
+
+  return res.json({ status: 'ok', tweet, model: thread.model, usage: await usageFor(user.id, plan.id) });
 });
 
 export function sendAiError(res: Response, err: GenerateError) {

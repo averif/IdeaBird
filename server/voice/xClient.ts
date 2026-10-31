@@ -11,7 +11,7 @@ const apiBase = () => (process.env.X_API_BASE_URL || 'https://api.x.com').replac
 const authorizeUrl = () => process.env.X_AUTHORIZE_URL || 'https://x.com/i/oauth2/authorize';
 const REQUEST_TIMEOUT_MS = 15_000;
 
-export type XErrorKind = 'unauthorized' | 'forbidden' | 'rate_limited' | 'invalid_grant' | 'unavailable';
+export type XErrorKind = 'unauthorized' | 'forbidden' | 'rate_limited' | 'invalid_grant' | 'no_credits' | 'unavailable';
 
 /** An X API failure. Never carries tokens; `message` is for server logs only. */
 export class XApiError extends Error {
@@ -74,6 +74,9 @@ function errorFor(res: Response, what: string): XApiError {
   }
   if (res.status === 401) return new XApiError('unauthorized', `${what}: 401`);
   if (res.status === 403) return new XApiError('forbidden', `${what}: 403`);
+  // Pay-per-use X API: reading posts spends credits on IdeaBird's developer
+  // account (reading the profile doesn't). 402 = that balance is empty.
+  if (res.status === 402) return new XApiError('no_credits', `${what}: 402`);
   return new XApiError('unavailable', `${what}: HTTP ${res.status}`);
 }
 

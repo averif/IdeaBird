@@ -143,6 +143,68 @@
   color: var(--text-muted);
 }
 
+.usage-note {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.upsell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  margin-top: 16px;
+  padding: 16px 18px;
+  border: 1px dashed var(--blue-soft);
+  border-radius: var(--radius-md);
+  background: #f7f8ff;
+}
+
+.upsell strong {
+  font-weight: 500;
+}
+
+.upsell p {
+  max-width: 560px;
+  margin-top: 2px;
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+}
+
+.plan-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  margin-bottom: 20px;
+  padding: 16px 18px;
+  border: 1px solid var(--blue);
+  border-radius: var(--radius-md);
+  background: #f5f7ff;
+}
+
+.plan-status strong {
+  font-weight: 500;
+}
+
+.plan-status p {
+  margin-top: 2px;
+  color: var(--text-secondary);
+  font-size: 0.86rem;
+}
+
+.nav-pro {
+  margin-left: auto;
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  color: var(--text-inverse);
+  background: var(--blue);
+  font-size: 0.68rem;
+  font-weight: 500;
+}
+
 .sidebar-section {
   flex: 1;
   min-height: 0;
@@ -818,6 +880,79 @@ kbd {
 
 a.btn {
   text-decoration: none;
+}
+
+/* --- Tone and instructions (Pro) --- */
+
+.settings-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.prefs {
+  display: grid;
+  gap: 14px;
+  padding: 16px 18px 18px;
+}
+
+.prefs-field {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.prefs-field legend,
+.prefs-label {
+  margin-bottom: 2px;
+  padding: 0;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.prefs-field textarea {
+  width: 100%;
+  min-height: 96px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.prefs-field textarea:focus {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(0, 0, 255, 0.12);
+}
+
+.prefs-count {
+  justify-self: end;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+.prefs-count.over {
+  color: var(--danger);
+}
+
+.prefs-hint {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.prefs-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 /* --- Write Like Me --- */

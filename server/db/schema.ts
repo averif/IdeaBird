@@ -62,6 +62,40 @@ CREATE TABLE IF NOT EXISTS rate_limits (
   reset_at  timestamptz NOT NULL
 );
 
+-- Billing (Dodo Payments). Kept on the user: one subscription per account.
+-- plan is what the user is entitled to right now; it is only ever set from a
+-- subscription fetched from Dodo's API (after checkout or on a signed webhook).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS plan text NOT NULL DEFAULT 'free' CHECK (plan IN ('free', 'pro'));
+ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_interval text CHECK (plan_interval IN ('month', 'year'));
+ALTER TABLE users ADD COLUMN IF NOT EXISTS dodo_customer_id text;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS dodo_subscription_id text;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS subscription_status text;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_renews_at timestamptz;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_cancels_at_period_end boolean NOT NULL DEFAULT false;
+-- Which Dodo environment the IDs above came from. Test and live are separate
+-- worlds in Dodo: an ID from one is unknown in the other. NULL = test_mode
+-- (everything stored before live mode existed).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS dodo_mode text CHECK (dodo_mode IN ('test_mode', 'live_mode'));
+CREATE INDEX IF NOT EXISTS users_dodo_subscription_idx ON users (dodo_subscription_id);
+CREATE INDEX IF NOT EXISTS users_dodo_customer_idx ON users (dodo_customer_id);
+
+-- Generations used per calendar month (UTC), for the plan allowances in
+-- shared/plans.ts. Counted separately from history, which Free doesn't keep.
+CREATE TABLE IF NOT EXISTS usage_monthly (
+  user_id      uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  month        date NOT NULL,
+  generations  integer NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_id, month)
+);
+
+-- Pro: tone and standing writing instructions applied to every generation.
+CREATE TABLE IF NOT EXISTS writing_preferences (
+  user_id       uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  tone          text NOT NULL DEFAULT 'default',
+  instructions  text NOT NULL DEFAULT '',
+  updated_at    timestamptz NOT NULL DEFAULT now()
+);
+
 -- Write Like Me. Pending X OAuth requests: single use, short-lived. Only the hash
 -- of the state and of the browser-binding nonce are stored.
 CREATE TABLE IF NOT EXISTS x_oauth_states (

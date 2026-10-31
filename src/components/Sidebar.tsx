@@ -12,15 +12,18 @@ import {
   LogOutIcon,
   PlusIcon,
   SettingsIcon,
+  SparkIcon,
 } from './icons';
 
-export type Page = 'create' | 'history' | 'settings';
+export type Page = 'create' | 'history' | 'plans' | 'settings';
 
 interface SidebarProps {
   page: Page;
   onNavigate: (page: Page) => void;
   onNewPost: () => void;
   recent: HistorySummary[] | null;
+  /** Free plan: no saved drafts. */
+  recentLocked?: boolean;
   activeHistoryId: string | null;
   onOpenRecent: (id: string) => void;
   /** Mobile drawer state; ignored on wide screens where the sidebar is always shown. */
@@ -32,6 +35,7 @@ interface SidebarProps {
 const NAV: { page: Page; label: string; icon: () => JSX.Element }[] = [
   { page: 'create', label: 'Create', icon: CreateIcon },
   { page: 'history', label: 'History', icon: HistoryIcon },
+  { page: 'plans', label: 'Plans', icon: SparkIcon },
   { page: 'settings', label: 'Settings', icon: SettingsIcon },
 ];
 
@@ -40,6 +44,7 @@ export function Sidebar({
   onNavigate,
   onNewPost,
   recent,
+  recentLocked = false,
   activeHistoryId,
   onOpenRecent,
   open,
@@ -108,6 +113,7 @@ export function Sidebar({
               <NavIcon />
               <span>{label}</span>
               {target === 'history' && recent && recent.length > 0 && <span className="nav-count">{recent.length}</span>}
+              {target === 'plans' && user?.plan === 'pro' && <span className="nav-pro">Pro</span>}
             </button>
           ))}
         </nav>
@@ -119,7 +125,7 @@ export function Sidebar({
               <span /><span /><span />
             </div>
           ) : recent.length === 0 ? (
-            <p className="recent-empty">Your drafts will show up here.</p>
+            <p className="recent-empty">{recentLocked ? 'Saved drafts come with Pro.' : 'Your drafts will show up here.'}</p>
           ) : (
             <ul className="recent-list">
               {recent.slice(0, 8).map((item) => (

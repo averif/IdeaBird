@@ -10,7 +10,7 @@
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.app.json",
     "build": "npm run typecheck && vite build",
     "preview": "vite preview",
-    "test": "tsx --test server/**/*.test.ts",
+    "test": "tsx --test --test-concurrency=3 server/**/*.test.ts",
     "db:migrate": "tsx server/db/migrate.ts"
   },
   "dependencies": {
@@ -19,6 +19,7 @@
     "@vercel/analytics": "^2.0.1",
     "@vercel/functions": "^3.10.3",
     "cookie-parser": "^1.4.7",
+    "dodopayments": "^2.59.0",
     "dotenv": "^16.4.7",
     "express": "^5.1.0",
     "helmet": "^8.3.0",
@@ -44,5 +45,10 @@
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vite": "^6.3.4"
+  },
+  "overrides": {
+    "@vercel/cli-config": {
+      "zod": "^4.6.7"
+    }
   }
 }

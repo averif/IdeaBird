@@ -4,15 +4,17 @@ import type { ToastType } from '../types';
 import type { VoiceControls } from '../voice';
 import { DevicesIcon, LogOutIcon, MailIcon, ShieldIcon } from './icons';
 import { WriteLikeMeCard } from './WriteLikeMe';
+import { WritingPreferencesCard } from './WritingPreferences';
 
 interface SettingsPageProps {
   active: boolean;
   draftCount: number | null;
   voice: VoiceControls;
+  onUpgrade: () => void;
   showToast: (message: string, type?: ToastType, duration?: number) => void;
 }
 
-export function SettingsPage({ active, draftCount, voice, showToast }: SettingsPageProps) {
+export function SettingsPage({ active, draftCount, voice, onUpgrade, showToast }: SettingsPageProps) {
   const { user, logout, logoutEverywhere, forgotPassword } = useAuth();
   const [busy, setBusy] = useState<string | null>(null);
 
@@ -37,7 +39,7 @@ export function SettingsPage({ active, draftCount, voice, showToast }: SettingsP
       <div className="page-head">
         <div>
           <h2>Settings</h2>
-          <p>Your account, voice and security.</p>
+          <p>Your account, writing style and security.</p>
         </div>
       </div>
 
@@ -63,11 +65,20 @@ export function SettingsPage({ active, draftCount, voice, showToast }: SettingsP
               <dd>{methods || 'Email'}</dd>
             </div>
             <div>
+              <dt>Plan</dt>
+              <dd>
+                {user.plan === 'pro' ? 'Pro' : 'Free'}
+                {user.plan === 'pro' && <span className="badge">Active</span>}
+              </dd>
+            </div>
+            <div>
               <dt>Saved drafts</dt>
               <dd>{draftCount ?? '—'}</dd>
             </div>
           </dl>
         </section>
+
+        <WritingPreferencesCard plan={user.plan} onUpgrade={onUpgrade} showToast={showToast} />
 
         <WriteLikeMeCard controls={voice} />
 
@@ -118,7 +129,12 @@ export function SettingsPage({ active, draftCount, voice, showToast }: SettingsP
               <span className="settings-icon"><ShieldIcon /></span>
               <div>
                 <strong>Your screenshots aren't stored</strong>
-                <p>Images are analyzed and discarded. Only a short summary and your drafts are saved, and you can delete them from History.</p>
+                <p>
+                  Images are analyzed and discarded.{' '}
+                  {user.plan === 'pro'
+                    ? 'Only a short summary and your drafts are saved, and you can delete them from History.'
+                    : "On Free, your drafts aren't saved either."}
+                </p>
               </div>
               <a className="btn btn-ghost btn-sm" href="/privacy.html" target="_blank" rel="noreferrer">
                 Privacy policy

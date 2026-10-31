@@ -57,6 +57,21 @@ function load() {
       process.env.MAIL_FROM ||
       (process.env.SMTP_USER && !process.env.RESEND_API_KEY ? `IdeaBird <${process.env.SMTP_USER}>` : 'IdeaBird <onboarding@resend.dev>'),
     generateLimitPerHour: Number(process.env.GENERATE_RATE_LIMIT_PER_HOUR || 30),
+    // Dodo Payments. Billing is off until the API key and the monthly product are set.
+    dodo: {
+      apiKey: process.env.DODO_PAYMENTS_API_KEY || '',
+      // Never live by accident: anything but "live_mode" is test mode.
+      environment: process.env.DODO_PAYMENTS_ENVIRONMENT === 'live_mode' ? ('live_mode' as const) : ('test_mode' as const),
+      // Either name works: Dodo's docs call it the webhook key, its dashboard the signing secret.
+      webhookKey: process.env.DODO_PAYMENTS_WEBHOOK_KEY || process.env.DODO_PAYMENTS_WEBHOOK_SECRET || '',
+      // Pro subscription products, one per billing period. Yearly is optional.
+      products: {
+        month: process.env.DODO_PRODUCT_ID || process.env.DODO_PRODUCT_ID_MONTHLY || '',
+        year: process.env.DODO_PRODUCT_ID_YEARLY || '',
+      },
+    },
+    // Write Like Me is hidden unless WRITE_LIKE_ME=on: no UI, no X calls, no voice in generation.
+    writeLikeMe: (process.env.WRITE_LIKE_ME || '').toLowerCase() === 'on',
     // Write Like Me: X OAuth 2.0 app (read-only). Leave X_CLIENT_ID empty to hide the feature.
     // X_CLIENT_SECRET is set for a confidential ("Web App") client, empty for a public one.
     xClientId: process.env.X_CLIENT_ID || '',

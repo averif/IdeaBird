@@ -108,5 +108,6 @@ export function publicUser(user: UserRow) {
     emailVerified: user.email_verified,
     hasPassword: Boolean(user.password_hash),
     googleLinked: Boolean(user.google_sub),
+    plan: user.plan,
   };
 }

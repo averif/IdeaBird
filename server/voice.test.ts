@@ -134,6 +134,7 @@ const portOf = (server: http.Server) => (server.address() as AddressInfo).port;
 process.env.DATABASE_URL = 'pglite:memory';
 process.env.JWT_SECRET = 'test-secret-that-is-definitely-longer-than-32-chars';
 process.env.APP_URL = 'http://localhost:5173';
+process.env.WRITE_LIKE_ME = 'on';
 process.env.X_CLIENT_ID = 'x-client';
 process.env.X_CLIENT_SECRET = 'x-secret';
 process.env.X_API_BASE_URL = `http://127.0.0.1:${portOf(fakeX)}`;
@@ -403,6 +404,12 @@ describe('learning the voice', () => {
     assert.equal(limited.data.code, 'x_rate_limited');
     assert.match(limited.data.error as string, /10 minutes/);
 
+    x.postsFailure = { status: 402 };
+    const noCredits = await api('POST', '/api/voice/refresh', { user });
+    assert.equal(noCredits.status, 503);
+    assert.equal(noCredits.data.code, 'x_no_credits');
+    assert.match(noCredits.data.error as string, /not your account/);
+
     x.postsFailure = { status: 503 };
     const down = await api('POST', '/api/voice/refresh', { user });
     assert.equal(down.status, 502);
@@ -468,6 +475,7 @@ describe('learning the voice', () => {
 describe('generation with Write Like Me', () => {
   test('without a profile, generation works as before', async () => {
     const user = await makeUser();
+    await query(`UPDATE users SET plan = 'pro' WHERE id = $1`, [user.id]);
     const r = await generate(user);
     assert.equal(r.status, 200, r.text);
     assert.equal(r.data.voice, false);

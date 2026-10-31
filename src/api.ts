@@ -1,5 +1,5 @@
 import { apiFetch } from './auth/client';
-import type { Analysis, AnalyzeResponse, GenerateResponse } from './types';
+import type { Analysis, AnalyzeResponse, GenerateResponse, ThreadResponse } from './types';
 
 function isLocalHost(): boolean {
   return ['localhost', '127.0.0.1'].includes(window.location.hostname);
@@ -40,6 +40,13 @@ async function readApiJson<T extends { error?: string }>(res: Response): Promise
   }
 }
 
+/** An API error with the server's machine-readable code, e.g. 'limit_reached'. */
+export class ApiCodeError extends Error {
+  constructor(message: string, public code?: string) {
+    super(message);
+  }
+}
+
 /** Thrown when the user must (re)authenticate first. */
 export class AuthRequiredError extends Error {
   constructor() {
@@ -60,8 +67,8 @@ async function postJson<T extends { error?: string }>(path: string, body: unknow
   }
 
   if (res.status === 401) throw new AuthRequiredError();
-  const data = await readApiJson<T>(res);
-  if (!res.ok) throw new Error(data.error || 'Something went wrong. Please try again.');
+  const data = await readApiJson<T & { code?: string }>(res);
+  if (!res.ok) throw new ApiCodeError(data.error || 'Something went wrong. Please try again.', data.code);
   return data;
 }
 
@@ -77,4 +84,9 @@ export function refineWithOcr(analysis: Analysis, ocrText: string) {
 
 export function generatePosts(analysis: Analysis, angle: string | null) {
   return postJson<GenerateResponse>('/api/generate', { ...analysis, angle });
+}
+
+/** Pro: expand one post into a full X thread, grounded in the same analysis. */
+export function expandThread(analysis: Analysis, post: string, generationId: string | null) {
+  return postJson<ThreadResponse>('/api/generate/thread', { ...analysis, post, generationId });
 }

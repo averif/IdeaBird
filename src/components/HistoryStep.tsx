@@ -12,13 +12,16 @@ interface HistoryStepProps {
   onOpenChange: (id: string | null) => void;
   onDeleted: (id: string) => void;
   onNew: () => void;
+  /** Free plan: history isn't kept. */
+  locked?: boolean;
+  onUpgrade?: () => void;
   showToast: (message: string, type?: ToastType, duration?: number) => void;
 }
 
 const dateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 const dayFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
 
-export function HistoryStep({ active, items, openId, onOpenChange, onDeleted, onNew, showToast }: HistoryStepProps) {
+export function HistoryStep({ active, items, openId, onOpenChange, onDeleted, onNew, locked = false, onUpgrade, showToast }: HistoryStepProps) {
   const [openItem, setOpenItem] = useState<HistoryItem | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [query, setQuery] = useState('');
@@ -78,7 +81,27 @@ export function HistoryStep({ active, items, openId, onOpenChange, onDeleted, on
 
   return (
     <section className={`step step-history${active ? ' active' : ''}`} id="step-history">
-      {showingItem ? (
+      {locked ? (
+        <>
+          <div className="page-head">
+            <div>
+              <h2>History</h2>
+              <p>Every post you generate, saved and searchable.</p>
+            </div>
+          </div>
+          <div className="upsell">
+            <div>
+              <strong>Saved drafts and history are part of Pro</strong>
+              <p>On Free, posts aren't saved, so copy the ones you like. Pro keeps every generation here, with search, and brings back drafts you saved before.</p>
+            </div>
+            {onUpgrade && (
+              <button className="btn btn-primary btn-sm" type="button" onClick={onUpgrade}>
+                Upgrade to Pro
+              </button>
+            )}
+          </div>
+        </>
+      ) : showingItem ? (
         <>
           <div className="page-head">
             <div>

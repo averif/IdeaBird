@@ -41,7 +41,7 @@ export function UploadStep({ active, onFile }: UploadStepProps) {
       <div className="page-head">
         <div>
           <h2>Upload a screenshot</h2>
-          <p>IdeaBird reads it, finds the story, and writes five drafts.</p>
+          <p>IdeaBird reads it, finds the story, and writes your post.</p>
         </div>
       </div>
 
