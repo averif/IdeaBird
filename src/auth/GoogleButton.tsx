@@ -44,6 +44,25 @@ export function GoogleButton({ clientId, onCredential, onError }: GoogleButtonPr
   const callbackRef = useRef(onCredential);
   callbackRef.current = onCredential;
   const [failed, setFailed] = useState(false);
+  // Google first paints an unstyled fallback (a huge logo) before its iframe loads.
+  // Keep the button hidden until the iframe is in, so the form doesn't jump.
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const node = containerRef.current;
+    if (!node) return;
+    const check = () => {
+      if (node.querySelector('iframe')) setReady(true);
+    };
+    const observer = new MutationObserver(check);
+    observer.observe(node, { childList: true, subtree: true });
+    // Never leave it hidden for good if Google changes its markup.
+    const fallback = window.setTimeout(() => setReady(true), 4000);
+    return () => {
+      observer.disconnect();
+      window.clearTimeout(fallback);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -76,5 +95,5 @@ export function GoogleButton({ clientId, onCredential, onError }: GoogleButtonPr
   }, [clientId, onError]);
 
   if (failed) return null;
-  return <div className="google-button" ref={containerRef} />;
+  return <div className={`google-button${ready ? ' ready' : ''}`} ref={containerRef} />;
 }
