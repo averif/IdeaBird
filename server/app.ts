@@ -7,6 +7,7 @@ import { config, ConfigError } from './config.js';
 import { generateRouter } from './generate/routes.js';
 import { historyRouter } from './history/routes.js';
 import { preferencesRouter } from './preferences/routes.js';
+import { refineRouter } from './refine/routes.js';
 import { analyzeRouter } from './vision/routes.js';
 import { voiceRouter } from './voice/routes.js';
 import { errorHandler } from './http.js';
@@ -62,6 +63,7 @@ export function createApp() {
   app.use('/api/voice', voiceRouter);
   app.use('/api/billing', billingRouter);
   app.use('/api/preferences', preferencesRouter);
+  app.use('/api/refine', refineRouter);
 
   app.use('/api', (_req, res) => {
     res.status(404).json({ error: 'Not found.' });

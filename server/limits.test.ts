@@ -18,6 +18,12 @@ let threadAnswer = JSON.stringify({
     'Find the mechanism before you celebrate the month.',
   ],
 });
+/** What the fake model answers to Refine calls, in order; the last one repeats. */
+let refineAnswers: string[] = [];
+const REFINED = {
+  refined: "Nobody warns you about launch week. It is quiet, and that's the most normal thing in the world.",
+  changes: ['Fixed punctuation', 'Sharper word choice'],
+};
 const TWEETS = JSON.stringify([
   { style: 'Hot Take Tweet', tweet: 'October did $12,430 from 1,240 users. 42% growth and nobody can say why, which worries me more than it should.' },
   { style: 'Question Tweet', tweet: 'We hit $12,430 and 1,240 users in October, up 42%. If you could check one thing to explain it, what would you check?' },
@@ -31,9 +37,12 @@ const nim = http.createServer((req, res) => {
   req.on('end', () => {
     const messages = (JSON.parse(body || '{}').messages ?? []) as { role: string; content: string }[];
     prompts.push(messages.find((m) => m.role === 'user')?.content ?? '');
-    const isThread = (messages.find((m) => m.role === 'system')?.content ?? '').includes('expand one social post');
+    const system = messages.find((m) => m.role === 'system')?.content ?? '';
+    const isThread = system.includes('expand one social post');
+    const isRefine = system.includes('the ear of Shakespeare');
+    const content = isRefine ? (refineAnswers.length > 1 ? refineAnswers.shift()! : refineAnswers[0]) : isThread ? threadAnswer : TWEETS;
     res.writeHead(nimFails ? 500 : 200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(nimFails ? { error: { message: 'boom' } } : { choices: [{ message: { content: isThread ? threadAnswer : TWEETS }, finish_reason: 'stop' }] }));
+    res.end(JSON.stringify(nimFails ? { error: { message: 'boom' } } : { choices: [{ message: { content }, finish_reason: 'stop' }] }));
   });
 });
 await new Promise<void>((resolve) => nim.listen(0, resolve));
@@ -69,6 +78,7 @@ after(() => {
 beforeEach(() => {
   nimFails = false;
   prompts = [];
+  refineAnswers = [JSON.stringify(REFINED)];
 });
 
 let n = 0;
@@ -314,5 +324,94 @@ describe('X thread expansion', () => {
     } finally {
       threadAnswer = previous;
     }
+  });
+});
+
+describe('Refine', () => {
+  const POST = 'honestly the thing nobody tells you about launching is the first week is really quiet and thats totally normal';
+  const refine = (user: User, body: Record<string, unknown> = { text: POST, platform: 'x' }) => api('POST', '/api/refine', user, body);
+
+  test('is a Pro feature and costs Free users nothing', async () => {
+    const user = await makeUser('free');
+    const r = await refine(user);
+    assert.equal(r.status, 403);
+    assert.equal(r.data.code, 'pro_required');
+    assert.equal(prompts.length, 0);
+  });
+
+  test('returns the polished post and counts one generation', async () => {
+    const user = await makeUser('pro');
+    const r = await refine(user);
+    assert.equal(r.status, 200, r.text);
+    assert.equal(r.data.refined, REFINED.refined);
+    // The slip fixed in code is named first.
+    assert.deepEqual(r.data.changes, ["thats → that's", ...REFINED.changes]);
+    assert.equal((r.data.usage as { used: number }).used, 1);
+
+    const prompt = prompts.at(-1)!;
+    assert.match(prompt, /POST TO REFINE:[\s\S]*the first week is really quiet and that's totally normal/);
+    assert.match(prompt, /within 280 characters/);
+    assert.doesNotMatch(prompt, /words/);
+    // Nothing is stored.
+    assert.equal((await query(`SELECT 1 FROM generations WHERE user_id = $1`, [user.id])).length, 0);
+  });
+
+  test('asks once more when the edit is too light, and keeps the real edit', async () => {
+    const user = await makeUser('pro');
+    // First answer is the post handed back (almost) unchanged.
+    const unchanged = { refined: POST.replace('thats', "that's"), changes: ['Fixed punctuation'] };
+    refineAnswers = [JSON.stringify(unchanged), JSON.stringify(REFINED)];
+    const r = await refine(user);
+    assert.equal(r.status, 200, r.text);
+    assert.equal(r.data.refined, REFINED.refined);
+    assert.equal(prompts.length, 2);
+  });
+
+  test('an X post that grew past 280 characters gets one pass to fit', async () => {
+    const user = await makeUser('pro');
+    const tooLong = { refined: `${REFINED.refined} ${'The quiet is where the real work begins, unseen. '.repeat(6)}`, changes: [] };
+    refineAnswers = [JSON.stringify(tooLong), JSON.stringify(REFINED)];
+    const r = await refine(user);
+    assert.equal(r.status, 200, r.text);
+    assert.equal(r.data.refined, REFINED.refined);
+    assert.equal(prompts.length, 2);
+  });
+
+  test('a much longer or shorter result is fine: there is no word limit', async () => {
+    const user = await makeUser('pro');
+    refineAnswers = [JSON.stringify({ refined: 'The first launch week is quiet. That is normal.', changes: ['Cut it down'] })];
+    const r = await refine(user);
+    assert.equal(r.status, 200, r.text);
+    assert.equal(r.data.refined, 'The first launch week is quiet. That is normal.');
+    assert.equal(prompts.length, 1);
+  });
+
+  test('rejects posts that are too short', async () => {
+    const user = await makeUser('pro');
+    assert.equal((await refine(user, { text: 'hi', platform: 'x' })).status, 400);
+    assert.equal(prompts.length, 0);
+  });
+
+  test('a bad answer from the model fails cleanly and gives the generation back', async () => {
+    const user = await makeUser('pro');
+    refineAnswers = ['not json'];
+    const r = await refine(user);
+    assert.notEqual(r.status, 200);
+    const billing = await api('GET', '/api/billing', user);
+    assert.equal((billing.data.usage as { used: number }).used, 0);
+  });
+});
+
+describe('Refine helpers', () => {
+  test('fixes clear slips in code, keeping capitals and lowercase style', async () => {
+    const { fixMechanical } = await import('./refine/refine.js');
+    assert.equal(fixMechanical("Dont worry, its fine and I cant stop. alot"), "Don't worry, its fine and I can't stop. a lot");
+    assert.equal(fixMechanical('im sure thats right'), "i'm sure that's right");
+  });
+
+  test('turns em dashes into commas unless the writer used them', async () => {
+    const { stripDashes } = await import('./refine/refine.js');
+    assert.equal(stripDashes('no dashes here', 'a clarity problem—they have one'), 'a clarity problem, they have one');
+    assert.equal(stripDashes('I like — dashes', 'still — here'), 'still — here');
   });
 });

@@ -6,6 +6,7 @@ import { apiJson } from './auth/client';
 import { getBillingStatus, takeUpgradeIntent, useCheckoutReturn } from './billing';
 import { HistoryStep } from './components/HistoryStep';
 import { PlansPage } from './components/PlansPage';
+import { RefinePage } from './components/RefinePage';
 import { SettingsPage } from './components/SettingsPage';
 import { Sidebar, type Page } from './components/Sidebar';
 import { StepProgress, Topbar } from './components/Topbar';
@@ -19,7 +20,7 @@ import type { Analysis, HistorySummary, ToastType, Tweet, Usage } from './types'
 import { useVoice } from './voice';
 
 type CreateStep = 'upload' | 'insights' | 'copy';
-const PAGE_TITLES: Record<Page, string> = { create: 'Create', history: 'History', plans: 'Plans', settings: 'Settings' };
+const PAGE_TITLES: Record<Page, string> = { create: 'Create', refine: 'Refine', history: 'History', plans: 'Plans', settings: 'Settings' };
 
 const VALID_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/bmp', 'image/gif'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -391,6 +392,15 @@ export default function Dashboard({ openAuth, showToast }: DashboardProps) {
               onExpand={expandIntoThread}
               expandLocked={plan === 'free'}
               expandingIndex={expandingIndex}
+            />
+            <RefinePage
+              active={page === 'refine'}
+              isPro={plan === 'pro'}
+              usage={usage}
+              onUsage={setUsage}
+              onUpgrade={() => navigate('plans')}
+              onAuthRequired={() => openAuth('login', SESSION_ENDED)}
+              showToast={showToast}
             />
             <HistoryStep
               active={page === 'history'}

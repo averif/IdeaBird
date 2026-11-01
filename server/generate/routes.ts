@@ -99,7 +99,7 @@ generateRouter.post('/', requireAuth, async (req, res) => {
 });
 
 /** 402 when this month's generations are used up. */
-async function limitReached(res: Response, user: UserRow, plan: Plan) {
+export async function limitReached(res: Response, user: UserRow, plan: Plan) {
   const usage = await usageFor(user.id, plan.id);
   const resets = new Date(usage.resetsAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' });
   return res.status(402).json({

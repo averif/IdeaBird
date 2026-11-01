@@ -1,5 +1,5 @@
 import { apiFetch } from './auth/client';
-import type { Analysis, AnalyzeResponse, GenerateResponse, ThreadResponse } from './types';
+import type { Analysis, AnalyzeResponse, GenerateResponse, ThreadResponse, Usage } from './types';
 
 function isLocalHost(): boolean {
   return ['localhost', '127.0.0.1'].includes(window.location.hostname);
@@ -84,6 +84,20 @@ export function refineWithOcr(analysis: Analysis, ocrText: string) {
 
 export function generatePosts(analysis: Analysis, angle: string | null) {
   return postJson<GenerateResponse>('/api/generate', { ...analysis, angle });
+}
+
+export type RefinePlatform = 'x' | 'linkedin';
+
+export interface RefineResponse {
+  refined?: string;
+  changes?: string[];
+  usage?: Usage;
+  error?: string;
+}
+
+/** Pro: polish a post the user wrote, keeping their voice and length. */
+export function refinePost(text: string, platform: RefinePlatform) {
+  return postJson<RefineResponse>('/api/refine', { text, platform });
 }
 
 /** Pro: expand one post into a full X thread, grounded in the same analysis. */

@@ -1,0 +1,397 @@
+/* --- Refine (Pro): a chat-style composer for polishing a pasted post --- */
+
+/* Fills the scroll area (minus the 60px topbar and .content's top padding) so the
+   composer sits at the bottom; its negative margin cancels .content's bottom padding. */
+.step.step-refine.active {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - 60px - 28px);
+}
+
+.refine-thread {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  max-width: 760px;
+  width: 100%;
+  margin: 0 auto;
+  padding-bottom: 24px;
+}
+
+.refine-empty {
+  margin: auto 0;
+  padding: 28px 0;
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+  text-align: center;
+}
+
+.refine-empty ul {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+  list-style: none;
+}
+
+.refine-empty li {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  color: var(--text-primary);
+  background: var(--bg-subtle);
+  font-size: 0.82rem;
+}
+
+.refine-turn {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: fadeSlideIn 280ms ease both;
+}
+
+.refine-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.refine-input {
+  align-self: flex-end;
+  max-width: 85%;
+  padding: 12px 16px;
+  border-radius: var(--radius-lg) var(--radius-lg) 4px var(--radius-lg);
+  background: var(--bg-subtle);
+}
+
+.refine-input p,
+.refine-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.55;
+}
+
+.refine-input p {
+  color: var(--text-secondary);
+  font-size: 0.92rem;
+}
+
+.refine-output {
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--bg-panel);
+  box-shadow: var(--shadow-sm);
+}
+
+.refine-output.error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-color: #f3c4c4;
+  color: #b42318;
+  font-size: 0.9rem;
+}
+
+.refine-output-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.refine-meta {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+}
+
+.refine-meta .over {
+  color: #b42318;
+}
+
+.refine-text {
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.refine-text mark {
+  padding: 0 1px;
+  border-radius: 3px;
+  color: inherit;
+  background: #e6edff;
+  box-shadow: inset 0 -1.5px 0 var(--blue-soft);
+}
+
+.refine-changes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 14px;
+  list-style: none;
+}
+
+.refine-changes li {
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  background: var(--bg-subtle);
+  font-size: 0.78rem;
+}
+
+.refine-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.refine-skeleton {
+  display: grid;
+  gap: 8px;
+}
+
+.refine-skeleton span {
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--bg-subtle) 0%, #eef1fb 50%, var(--bg-subtle) 100%);
+  background-size: 200% 100%;
+  animation: refineShimmer 1.2s ease-in-out infinite;
+}
+
+.refine-skeleton span:nth-child(2) {
+  width: 88%;
+}
+
+.refine-skeleton span:nth-child(3) {
+  width: 60%;
+}
+
+@keyframes refineShimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+.refine-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+
+.refine-toggle input {
+  accent-color: var(--blue);
+}
+
+/* The composer stays pinned to the bottom of the scroll area. */
+.refine-composer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  max-width: 760px;
+  width: 100%;
+  margin: 0 auto -64px;
+  padding: 12px 0 18px;
+  background: linear-gradient(to bottom, transparent, var(--bg-page) 24px);
+}
+
+.refine-box {
+  border: 1px solid var(--border-strong);
+  border-radius: 20px;
+  background: var(--bg-panel);
+  box-shadow: var(--shadow-md);
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+
+.refine-box:focus-within {
+  border-color: var(--blue-soft);
+  box-shadow: var(--shadow-md), 0 0 0 3px #eef2ff;
+}
+
+.refine-box textarea {
+  display: block;
+  width: 100%;
+  min-height: 76px;
+  padding: 16px 18px 6px;
+  border: 0;
+  outline: none;
+  resize: none;
+  color: var(--text-primary);
+  background: transparent;
+  font: inherit;
+  font-size: 0.98rem;
+  line-height: 1.5;
+}
+
+.refine-box-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px 8px 12px;
+}
+
+.refine-platform {
+  display: inline-flex;
+  padding: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-subtle);
+}
+
+.refine-platform button {
+  padding: 4px 12px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  color: var(--text-secondary);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8rem;
+}
+
+.refine-platform button.active {
+  color: var(--text-primary);
+  background: var(--bg-panel);
+  box-shadow: var(--shadow-sm);
+}
+
+.refine-count {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+.refine-count.over {
+  color: #b42318;
+}
+
+.refine-send {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  color: var(--text-inverse);
+  background: var(--blue);
+  cursor: pointer;
+  transition: opacity var(--transition), transform var(--transition);
+}
+
+.refine-send:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.refine-send:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.refine-send svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.refine-hint {
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: 0.74rem;
+  text-align: center;
+}
+
+/* Free plan: a before/after preview and the upgrade. */
+.refine-locked {
+  display: grid;
+  gap: 18px;
+  max-width: 640px;
+  padding: 22px;
+  border: 1px dashed var(--blue-soft);
+  border-radius: var(--radius-lg);
+  background: #f7f8ff;
+}
+
+.refine-locked strong {
+  font-weight: 500;
+}
+
+.refine-locked p {
+  margin-top: 4px;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+}
+
+.refine-locked .btn {
+  justify-self: start;
+}
+
+.refine-example {
+  display: grid;
+  gap: 8px;
+}
+
+.refine-example p {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.refine-example-before {
+  color: var(--text-muted) !important;
+  background: var(--bg-panel);
+  text-decoration: line-through;
+  text-decoration-color: rgba(0, 0, 0, 0.18);
+}
+
+.refine-example-after {
+  color: var(--text-primary) !important;
+  background: var(--bg-panel);
+  box-shadow: var(--shadow-sm);
+}
+
+.refine-example mark {
+  border-radius: 3px;
+  background: #e6edff;
+}
+
+.nav-pro.nav-pro-muted {
+  color: var(--blue);
+  background: #eef2ff;
+}
+
+@media (max-width: 720px) {
+  .refine-input {
+    max-width: 100%;
+  }
+
+  .step.step-refine.active {
+    min-height: calc(100dvh - 60px - 20px);
+  }
+
+  .refine-composer {
+    margin-bottom: -48px;
+  }
+}

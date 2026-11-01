@@ -41,6 +41,7 @@ const ROWS: Row[] = [
   { label: 'Custom tone and writing instructions', value: (p) => soon(p.limits.customVoice, 'customVoice') },
   { label: 'Saved drafts and history', value: (p) => p.limits.history },
   { label: 'X thread expansion', value: (p) => soon(p.limits.threadExpansion, 'threadExpansion') },
+  { label: 'Refine your own posts', hint: 'X and LinkedIn', value: (p) => soon(p.limits.refine, 'refine') },
 ];
 
 /** An included feature that isn't built yet shows as "Coming soon". */
@@ -60,6 +61,7 @@ function highlights(plan: Plan): { text: string; included: boolean; soon?: boole
     { text: 'Saved drafts and generation history', included: limits.history },
     { text: 'Custom tone and writing instructions', included: limits.customVoice, soon: limits.customVoice && COMING_SOON.customVoice },
     { text: 'X thread expansion', included: limits.threadExpansion, soon: limits.threadExpansion && COMING_SOON.threadExpansion },
+    { text: 'Refine your own X and LinkedIn posts', included: limits.refine, soon: limits.refine && COMING_SOON.refine },
   ];
 }
 

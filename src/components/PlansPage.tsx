@@ -134,6 +134,11 @@ function ProFeatures({ usage, onNavigate }: ProFeaturesProps) {
       title: 'X thread expansion',
       detail: 'Turn any draft into a numbered X thread with "Expand into thread".',
     },
+    {
+      title: 'Refine your own posts',
+      detail: 'Paste a rough thought or a post and get back something eloquent, wise and worth quoting.',
+      link: { label: 'Open Refine', page: 'refine' },
+    },
   ];
 
   return (

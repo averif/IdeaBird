@@ -36,6 +36,16 @@ export const CreateIcon = () => (
   </Icon>
 );
 
+export const RefineIcon = () => (
+  <Icon>
+    <path d="m4 20 10-10" />
+    <path d="m13 7 4 4" />
+    <path d="M17 3v3M15.5 4.5h3" />
+    <path d="M20 9v2M19 10h2" />
+    <path d="M8 4v2M7 5h2" />
+  </Icon>
+);
+
 export const HistoryIcon = () => (
   <Icon>
     <path d="M3 12a9 9 0 1 0 3-6.7" />

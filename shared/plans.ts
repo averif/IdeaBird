@@ -16,6 +16,8 @@ export interface PlanLimits {
   customVoice: boolean;
   /** Turn a single post into a full X thread. */
   threadExpansion: boolean;
+  /** Paste a post and get it back polished (Refine page). */
+  refine: boolean;
 }
 
 export interface Plan {
@@ -50,6 +52,7 @@ export const PLANS: Record<PlanId, Plan> = {
       history: false,
       customVoice: false,
       threadExpansion: false,
+      refine: false,
     },
   },
   pro: {
@@ -67,6 +70,7 @@ export const PLANS: Record<PlanId, Plan> = {
       history: true,
       customVoice: true,
       threadExpansion: true,
+      refine: true,
     },
   },
 };

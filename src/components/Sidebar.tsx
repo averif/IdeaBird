@@ -11,11 +11,12 @@ import {
   HistoryIcon,
   LogOutIcon,
   PlusIcon,
+  RefineIcon,
   SettingsIcon,
   SparkIcon,
 } from './icons';
 
-export type Page = 'create' | 'history' | 'plans' | 'settings';
+export type Page = 'create' | 'refine' | 'history' | 'plans' | 'settings';
 
 interface SidebarProps {
   page: Page;
@@ -34,6 +35,7 @@ interface SidebarProps {
 
 const NAV: { page: Page; label: string; icon: () => JSX.Element }[] = [
   { page: 'create', label: 'Create', icon: CreateIcon },
+  { page: 'refine', label: 'Refine', icon: RefineIcon },
   { page: 'history', label: 'History', icon: HistoryIcon },
   { page: 'plans', label: 'Plans', icon: SparkIcon },
   { page: 'settings', label: 'Settings', icon: SettingsIcon },
@@ -114,6 +116,7 @@ export function Sidebar({
               <span>{label}</span>
               {target === 'history' && recent && recent.length > 0 && <span className="nav-count">{recent.length}</span>}
               {target === 'plans' && user?.plan === 'pro' && <span className="nav-pro">Pro</span>}
+              {target === 'refine' && user?.plan !== 'pro' && <span className="nav-pro nav-pro-muted">Pro</span>}
             </button>
           ))}
         </nav>
