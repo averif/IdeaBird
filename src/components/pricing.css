@@ -232,6 +232,36 @@
   color: var(--blue);
 }
 
+/* Launch offer: discounted months and the price after them. */
+.pr-offer {
+  margin-bottom: 22px;
+  padding: 12px 14px;
+  border: 1px dashed var(--blue-soft);
+  border-radius: var(--radius-md);
+  background: #f5f7ff;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.pr-offer-tag {
+  display: inline-block;
+  margin-bottom: 6px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  color: var(--text-inverse);
+  background: var(--blue);
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pr-offer strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
 /* --- Buttons --- */
 
 .pr-btn {

@@ -20,6 +20,8 @@ const dodo = {
   checkouts: [] as Record<string, unknown>[],
   portalFor: [] as string[],
   failCheckout: false,
+  /** Dodo answers a checkout that carries a discount code with 422 (expired or used-up code). */
+  rejectDiscount: false,
 };
 
 const fakeDodo = http.createServer((req, res) => {
@@ -35,7 +37,9 @@ const fakeDodo = http.createServer((req, res) => {
 
     if (req.method === 'POST' && url.pathname === '/checkouts') {
       if (dodo.failCheckout) return send(500, { message: 'internal error for merchant acct_123' });
-      dodo.checkouts.push(JSON.parse(body));
+      const parsed = JSON.parse(body);
+      if (dodo.rejectDiscount && parsed.discount_codes?.length) return send(422, { message: 'discount code expired' });
+      dodo.checkouts.push(parsed);
       return send(200, { session_id: `cks_${dodo.checkouts.length}`, checkout_url: `https://test.checkout.dodopayments.com/session/cks_${dodo.checkouts.length}` });
     }
     const sub = /^\/subscriptions\/([^/]+)$/.exec(url.pathname);
@@ -68,6 +72,7 @@ process.env.DODO_PAYMENTS_WEBHOOK_KEY = WEBHOOK_SECRET;
 const { createApp } = await import('./app.js');
 const { query } = await import('./db/index.js');
 const { signAccessToken } = await import('./auth/tokens.js');
+const { activeOffer, LAUNCH_OFFER } = await import('../shared/plans.js');
 
 let base = '';
 let closeApp: () => void;
@@ -87,6 +92,7 @@ beforeEach(async () => {
   dodo.checkouts = [];
   dodo.portalFor = [];
   dodo.failCheckout = false;
+  dodo.rejectDiscount = false;
   await query(`DELETE FROM rate_limits`);
 });
 
@@ -161,6 +167,27 @@ describe('checkout', () => {
     const r = await api('POST', '/api/billing/checkout', { user, body: { plan: 'pro', interval: 'year' } });
     assert.equal(r.status, 503);
     assert.equal(dodo.checkouts.length, 0);
+  });
+
+  test('the launch discount is applied automatically to monthly checkouts', async () => {
+    const user = await makeUser();
+    const r = await api('POST', '/api/billing/checkout', { user, body: { plan: 'pro', interval: 'month' } });
+    assert.equal(r.status, 200, r.text);
+    const offer = activeOffer('month');
+    const sent = dodo.checkouts[0] as { discount_codes?: string[] };
+    // Once the offer has ended, checkouts go through at full price with no code.
+    assert.deepEqual(sent.discount_codes, offer ? [offer.code] : undefined);
+    assert.equal(r.data.discount, offer ? offer.code : null);
+  });
+
+  test("a code Dodo rejects doesn't block the upgrade: it checks out at full price", async () => {
+    const user = await makeUser();
+    dodo.rejectDiscount = true;
+    const r = await api('POST', '/api/billing/checkout', { user, body: { plan: 'pro', interval: 'month' } });
+    assert.equal(r.status, 200, r.text);
+    assert.equal(r.data.discount, null);
+    assert.equal(dodo.checkouts.length, 1);
+    assert.equal((dodo.checkouts[0] as { discount_codes?: string[] }).discount_codes, undefined);
   });
 
   test("a Dodo failure is reported without leaking Dodo's error text", async () => {
@@ -307,5 +334,16 @@ describe('webhooks', () => {
   test('payment events are acknowledged and ignored', async () => {
     const { raw, headers } = signedWebhook({ type: 'payment.succeeded', data: { payment_id: 'pay_1' } });
     assert.equal((await api('POST', '/api/billing/webhook', { raw, headers })).status, 200);
+  });
+});
+
+describe('launch offer', () => {
+  test('is monthly-only and ends when the Dodo code expires', () => {
+    if (!LAUNCH_OFFER) return;
+    const before = new Date(Date.parse(LAUNCH_OFFER.endsAt) - 60_000);
+    const afterEnd = new Date(Date.parse(LAUNCH_OFFER.endsAt) + 60_000);
+    assert.equal(activeOffer('month', before)?.code, LAUNCH_OFFER.code);
+    assert.equal(activeOffer('year', before), null);
+    assert.equal(activeOffer('month', afterEnd), null);
   });
 });

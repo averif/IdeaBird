@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  activeOffer,
   BILLING,
   COMING_SOON,
   formatPrice,
+  offerPrice,
   PLAN_ORDER,
   PLANS,
   pricePerMonth,
@@ -140,6 +142,10 @@ export function PricingPlans({
   const moreGenerations = Math.round(pro.limits.generationsPerMonth / Math.max(1, free.limits.generationsPerMonth));
   const savings = yearlySavingsPercent(pro);
 
+  // Launch discount (shared/plans.ts), applied automatically at checkout.
+  const offer = activeOffer(interval);
+  const monthlyOffer = activeOffer('month');
+
   const priceNote = (plan: Plan) => {
     if (plan.monthlyPrice === 0) return 'No card needed.';
     if (interval === 'year') return `Billed ${formatPrice(plan.yearlyPrice)} once a year.${savings ? ` You save ${savings}%.` : ''}`;
@@ -177,6 +183,10 @@ export function PricingPlans({
         )}
         <p>
           {interval === 'year' ? 'Billed once a year' : 'Billed monthly'} in {BILLING.currency}. Cancel anytime from Billing.
+          {/* The launch discount is monthly-only: point to it from the yearly view. */}
+          {interval === 'year' && monthlyOffer && currentPlan !== 'pro' && (
+            <> Launch offer: {monthlyOffer.percentOff}% off your first {monthlyOffer.cycles} months on monthly billing.</>
+          )}
         </p>
       </div>
 
@@ -185,6 +195,8 @@ export function PricingPlans({
           const plan = PLANS[id];
           const featured = plan.monthlyPrice > 0;
           const action = cta(plan);
+          const planOffer = featured && currentPlan !== plan.id ? offer : null;
+          const note = planOffer ? null : priceNote(plan);
           return (
             <article
               key={plan.id}
@@ -202,14 +214,26 @@ export function PricingPlans({
               <p className="pr-price">
                 {/* Keyed so the figure animates when the billing period changes. */}
                 <span className="pr-amount" key={`${plan.id}-${interval}`}>
-                  {formatPrice(pricePerMonth(plan, interval))}
+                  {formatPrice(planOffer ? offerPrice(plan, planOffer) : pricePerMonth(plan, interval))}
                 </span>
                 <span className="pr-per">/ month</span>
-                {featured && interval === 'year' && plan.monthlyPrice > pricePerMonth(plan, interval) && (
+                {featured && (planOffer || (interval === 'year' && plan.monthlyPrice > pricePerMonth(plan, interval))) && (
                   <s className="pr-was" aria-label={`instead of ${formatPrice(plan.monthlyPrice)}`}>{formatPrice(plan.monthlyPrice)}</s>
                 )}
               </p>
-              <p className="pr-price-note">{priceNote(plan)}</p>
+              {note && <p className="pr-price-note">{note}</p>}
+              {planOffer && (
+                <div className="pr-offer">
+                  <span className="pr-offer-tag">Launch offer · {planOffer.code}</span>
+                  <p>
+                    <strong>
+                      {planOffer.percentOff}% off your first {planOffer.cycles} months
+                    </strong>{' '}
+                    ({formatPrice(offerPrice(plan, planOffer))} a month). From month {planOffer.cycles + 1} it's{' '}
+                    {formatPrice(plan.monthlyPrice)} a month. Applied automatically at checkout.
+                  </p>
+                </div>
+              )}
 
               <button
                 type="button"

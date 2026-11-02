@@ -77,6 +77,41 @@ export const PLANS: Record<PlanId, Plan> = {
 
 export const PLAN_ORDER: PlanId[] = ['free', 'pro'];
 
+export interface LaunchOffer {
+  /** Dodo discount code, applied automatically at checkout. */
+  code: string;
+  percentOff: number;
+  /** Billing cycles the discount lasts; full price after. */
+  cycles: number;
+  /** The only billing period it applies to (the Dodo discount is restricted to that product). */
+  interval: BillingInterval;
+  /** When the code expires in Dodo. The offer disappears after this. */
+  endsAt: string;
+}
+
+/**
+ * The launch discount. Must match the discount set up in Dodo (LAUNCH50: 50%,
+ * 2 cycles, monthly Pro only, expires 2 Jan 2027). Set to null to switch it off.
+ */
+export const LAUNCH_OFFER: LaunchOffer | null = {
+  code: 'LAUNCH50',
+  percentOff: 50,
+  cycles: 2,
+  interval: 'month',
+  endsAt: '2027-01-02T23:59:59.999Z',
+};
+
+/** The launch offer if it applies to this billing period right now, else null. */
+export function activeOffer(interval: BillingInterval, now: Date = new Date()): LaunchOffer | null {
+  if (!LAUNCH_OFFER || LAUNCH_OFFER.interval !== interval) return null;
+  return now.getTime() <= Date.parse(LAUNCH_OFFER.endsAt) ? LAUNCH_OFFER : null;
+}
+
+/** The discounted price for the offer's cycles, rounded to cents. */
+export function offerPrice(plan: Plan, offer: LaunchOffer): number {
+  return Math.round(plan.monthlyPrice * (100 - offer.percentOff)) / 100;
+}
+
 /**
  * Features announced on the pricing page but not built yet. They're labelled
  * "Coming soon" so nobody pays for something that doesn't exist. Remove a key

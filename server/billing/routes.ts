@@ -6,6 +6,7 @@ import { query } from '../db/index.js';
 import { HttpError, parseBody } from '../http.js';
 import { rateLimit } from '../security/rateLimit.js';
 import { usageFor } from './usage.js';
+import { activeOffer } from '../../shared/plans.js';
 import { availableIntervals, customerIdSql, dodo, dodoMode, productFor, SubscriptionMismatch, syncSubscription } from './dodo.js';
 
 export const billingRouter = Router();
@@ -69,20 +70,38 @@ billingRouter.post('/checkout', requireAuth, async (req, res) => {
     user.id,
     dodoMode(),
   ]);
-  try {
-    const session = await dodo().checkoutSessions.create({
+  const createSession = (discountCode: string | null) =>
+    dodo().checkoutSessions.create({
       product_cart: [{ product_id: productFor(interval), quantity: 1 }],
       // Reuse the Dodo customer after a past subscription; otherwise Dodo creates one.
       customer: row?.dodo_customer_id ? { customer_id: row.dodo_customer_id } : { email: user.email, ...(user.name ? { name: user.name } : {}) },
       // Ties the subscription to this account; read back server-side, never trusted from the browser.
       metadata: { user_id: user.id },
       return_url: `${config().appUrl}/?billing=return`,
+      // The launch discount, pre-applied (shared/plans.ts). Dodo shows it on the checkout page.
+      ...(discountCode ? { discount_codes: [discountCode] } : {}),
     });
+
+  // Never let the offer block an upgrade: if Dodo rejects the code (expired,
+  // used up, changed), check out at full price instead.
+  const offer = activeOffer(interval);
+  let session;
+  let discounted = false;
+  try {
+    if (offer) {
+      session = await createSession(offer.code).catch((err) => {
+        const status = (err as { status?: number }).status;
+        console.warn(`[IdeaBird] Dodo rejected discount ${offer.code}${status ? ` (HTTP ${status})` : ''}; checking out at full price.`);
+        return null;
+      });
+      discounted = Boolean(session);
+    }
+    session ??= await createSession(null);
     if (!session.checkout_url) throw new Error('No checkout URL');
-    res.json({ checkoutUrl: session.checkout_url });
   } catch (err) {
     throw dodoFailure(err, 'checkout');
   }
+  res.json({ checkoutUrl: session.checkout_url, discount: discounted ? offer!.code : null });
 });
 
 /**
