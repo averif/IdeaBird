@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>IdeaBird Reel</title>
+<link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&family=Google+Sans+Flex:wght@300..800&display=swap" rel="stylesheet" />
+<style>
+  :root { --blue: #0000ff; --blue-glow: #4b63ff; --ink: #0d0d12; --sec: #6f6f6f; --muted: #8a8a8a; --border: #ececf1; --red: #ff2b2b; --green: #0f9d58; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1080px; height: 1920px; overflow: hidden; background: #000; }
+  body { font-family: 'Google Sans Flex', system-ui, sans-serif; color: var(--ink); -webkit-font-smoothing: antialiased; }
+  #stage { position: absolute; inset: 0; overflow: hidden; }
+  .layer, .scene { position: absolute; inset: 0; }
+  .abs { position: absolute; }
+  .mono { font-family: 'Geist Mono', monospace; }
+
+  /* reels-style captions: white boxes behind each line */
+  .cap { position: absolute; left: 70px; right: 70px; text-align: center; font-size: 68px; font-weight: 700; line-height: 1.52; letter-spacing: -.02em; }
+  .cap span { background: #fff; color: #000; padding: 4px 24px; border-radius: 20px; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+  .cap em { font-style: normal; color: var(--blue); }
+
+  /* ---------- S1/S2: photos ---------- */
+  #photos { background: #000; }
+  #ph-head { left: 0; right: 0; top: 0; height: 430px; background: linear-gradient(#000 70%, rgba(0,0,0,0)); z-index: 2; padding: 110px 44px 0; color: #fff; }
+  #ph-head .back { font-size: 40px; color: #3d8bff; }
+  #ph-head h1 { font-size: 84px; font-weight: 700; letter-spacing: -.03em; margin-top: 16px; }
+  #ph-head .ct { font-size: 40px; color: #8e8e93; margin-top: 4px; }
+  #grid { left: 0; right: 0; top: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; }
+  .th { height: 268px; overflow: hidden; position: relative; }
+  .th i { position: absolute; display: block; border-radius: 4px; }
+  #bignum { left: 0; right: 0; top: 400px; text-align: center; color: #fff; }
+  #bignum b { display: block; font-size: 300px; font-weight: 800; letter-spacing: -.06em; line-height: 1; }
+  #bignum span { display: block; font-size: 66px; color: #a0a0aa; font-weight: 500; margin-top: 18px; }
+
+  /* bird + bubbles */
+  .bird { position: absolute; width: 360px; height: 270px; transform-origin: 50% 60%; }
+  .bird svg { width: 100%; height: 100%; overflow: visible; display: block; filter: drop-shadow(0 0 0 #fff) drop-shadow(4px 0 0 #fff) drop-shadow(-4px 0 0 #fff) drop-shadow(0 4px 0 #fff) drop-shadow(0 -4px 0 #fff) drop-shadow(0 22px 30px rgba(0,0,0,.45)); }
+  .bubble { position: absolute; background: #fff; color: #000; border-radius: 44px; padding: 34px 44px; font-size: 64px; font-weight: 700; line-height: 1.2; letter-spacing: -.02em; white-space: pre-line; box-shadow: 0 30px 70px rgba(0,0,0,.4); transform-origin: 85% 100%; }
+  .bubble::after { content: ''; position: absolute; right: 120px; bottom: -40px; border: 26px solid transparent; border-top: 30px solid #fff; border-bottom: 0; }
+
+  /* ---------- S3: screenshot cards ---------- */
+  #s3bg { background: radial-gradient(circle at 50% 40%, #1b1b28, #07070b 70%); }
+  .card { position: absolute; left: 100px; top: 560px; width: 880px; height: 1120px; border-radius: 44px; overflow: hidden; padding: 64px 60px; box-shadow: 0 50px 120px rgba(0,0,0,.6); }
+  .card.light { background: #fff; }
+  .card.dark { background: #000; color: #fff; border: 2px solid #2a2a33; }
+  .card .k { font-size: 30px; color: var(--muted); font-family: 'Geist Mono'; text-transform: uppercase; letter-spacing: .04em; }
+  .card .big { font-size: 130px; font-weight: 700; letter-spacing: -.05em; margin-top: 20px; }
+  .card .chip { display: inline-block; font-size: 40px; font-weight: 700; padding: 10px 26px; border-radius: 999px; background: #e7f6ee; color: var(--green); }
+  .card .stats { display: flex; justify-content: space-between; margin-top: 40px; }
+  .card .stats div { font-size: 30px; color: var(--muted); font-family: 'Geist Mono'; }
+  .card .stats b { display: block; font-size: 54px; color: var(--ink); font-family: 'Google Sans Flex'; letter-spacing: -.03em; margin-top: 6px; }
+  .tw-h { display: flex; gap: 26px; align-items: center; }
+  .tw-av { width: 110px; height: 110px; border-radius: 50%; background: linear-gradient(135deg, #ffb347, #ff5e62); }
+  .tw-n { font-size: 46px; font-weight: 700; } .tw-n span { display: block; font-size: 38px; color: #71767b; font-weight: 400; }
+  .tw-t { font-size: 58px; line-height: 1.32; margin-top: 44px; letter-spacing: -.01em; }
+  .tw-m { display: flex; gap: 56px; margin-top: 50px; font-size: 38px; color: #71767b; }
+  .saved { position: absolute; left: 60px; bottom: 56px; font-family: 'Geist Mono'; font-size: 32px; padding: 14px 26px; border-radius: 999px; background: rgba(127,127,127,.14); color: #8a8a96; }
+  .stamp { position: absolute; left: 50%; top: 52%; width: 760px; margin-left: -380px; text-align: center; font-size: 118px; font-weight: 800; letter-spacing: .02em; line-height: 1;
+           color: var(--red); border: 14px solid var(--red); border-radius: 26px; padding: 26px 0 30px; background: rgba(255,43,43,.06); mix-blend-mode: normal; }
+
+  /* ---------- S4: IdeaBird app ---------- */
+  #s4bg { background: #eef0f6; }
+  #sheet { left: 0; right: 0; top: 520px; bottom: 0; background: #fff; border-radius: 56px 56px 0 0; box-shadow: 0 -20px 80px rgba(10,20,90,.12); }
+  #apphead { position: absolute; left: 50px; right: 50px; top: 46px; display: flex; align-items: center; gap: 20px; font-size: 50px; font-weight: 700; letter-spacing: -.03em; }
+  .mark { width: 76px; height: 76px; border-radius: 19px; background: var(--blue); display: grid; place-items: center; }
+  .mark svg { width: 52px; height: 39px; }
+  #timer { margin-left: auto; height: 84px; padding: 0 30px; border-radius: 999px; background: #fff0f0; color: #d11; display: flex; align-items: center; gap: 16px; font-family: 'Geist Mono'; font-size: 44px; font-weight: 600; }
+  #timer i { width: 20px; height: 20px; border-radius: 50%; background: #e11; display: block; }
+  #up { position: absolute; left: 50px; right: 50px; top: 170px; height: 300px; border-radius: 34px; background: #f6f7fb; border: 2px solid var(--border); display: flex; align-items: center; gap: 40px; padding: 0 36px; overflow: hidden; }
+  #upthumb { width: 168px; height: 228px; border-radius: 18px; background: #fff; box-shadow: 0 10px 30px rgba(0,0,0,.12); flex: none; position: relative; overflow: hidden; }
+  #upstat { font-size: 46px; font-weight: 700; letter-spacing: -.02em; }
+  #upstat small { display: block; font-size: 32px; color: var(--muted); font-weight: 500; margin-top: 8px; font-family: 'Geist Mono'; }
+  #scanl { position: absolute; left: 0; right: 0; height: 5px; background: var(--blue); box-shadow: 0 0 24px 6px rgba(40,70,255,.5); }
+  .pc { position: absolute; left: 50px; right: 50px; height: 160px; border-radius: 30px; background: #fff; border: 2px solid var(--border); box-shadow: 0 14px 40px rgba(10,20,90,.08); padding: 22px 30px; }
+  #bub5::after { right: auto; left: 50%; margin-left: -26px; }
+  .pc .bd { display: inline-flex; align-items: center; gap: 12px; height: 54px; padding: 0 22px; border-radius: 999px; background: #eef1ff; color: var(--blue); font-size: 30px; font-weight: 700; }
+  .pc .tx { font-size: 36px; line-height: 1.3; margin-top: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -.01em; }
+  .pc .cp { position: absolute; right: 32px; top: 26px; height: 54px; padding: 0 24px; border-radius: 999px; border: 2px solid var(--border); font-size: 28px; font-weight: 600; display: flex; align-items: center; color: #444; }
+
+  /* ---------- S5: threat ---------- */
+  #s5bg { background: radial-gradient(circle at 50% 45%, #3a0a10, #0c0306 70%); }
+  #copy { left: 290px; top: 1080px; width: 500px; height: 170px; border-radius: 999px; background: var(--blue); color: #fff; display: grid; place-items: center; font-size: 76px; font-weight: 700; letter-spacing: -.02em; box-shadow: 0 30px 80px rgba(0,0,255,.5); }
+  #mini { left: 90px; right: 90px; top: 1440px; }
+  #mini .lbl { color: #fff; font-size: 40px; font-weight: 600; display: flex; justify-content: space-between; margin-bottom: 20px; }
+  #mini .lbl span { font-family: 'Geist Mono'; color: #ff6b6b; }
+  #mini .g { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+  #mini .g .th { height: 140px; border-radius: 10px; }
+
+  /* ---------- S6: end card ---------- */
+  #s6bg { background: radial-gradient(circle at 50% 38%, #2a3cff, #0000ff 55%, #0000d0); }
+  #lock { left: 0; right: 0; top: 470px; display: flex; flex-direction: column; align-items: center; gap: 40px; }
+  #lock .lm { width: 230px; height: 230px; border-radius: 56px; background: #fff; display: grid; place-items: center; box-shadow: 0 40px 90px rgba(0,0,60,.4); }
+  #lock .lm svg { width: 156px; height: 117px; }
+  #lock .lw { font-size: 150px; font-weight: 700; color: #fff; letter-spacing: -.055em; line-height: 1; }
+  #cta { top: 1060px; }
+  #url { left: 0; right: 0; top: 1420px; text-align: center; color: rgba(255,255,255,.85); font-size: 50px; font-weight: 500; letter-spacing: -.01em; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- S1/S2 photos -->
+  <div id="photos" class="scene">
+    <div id="grid" class="abs"></div>
+    <div id="ph-head" class="abs"><div class="back">‹ Albums</div><h1>Screenshots</h1><div class="ct"><span id="cnt">0</span> Items</div></div>
+    <div id="bignum" class="abs"><b id="bn">4,812</b><span>screenshots</span></div>
+    <div id="cap1" class="cap" style="top: 520px"><span>go check how many</span><br><span>screenshots you have.</span><br><span>i'll wait.</span></div>
+  </div>
+
+  <!-- S3 cards -->
+  <div id="s3" class="scene">
+    <div id="s3bg" class="layer"></div>
+    <div class="card light" id="c0">
+      <div class="k">Revenue · Last 30 days</div>
+      <div class="big">$128.4K</div>
+      <span class="chip">+42% MoM</span>
+      <svg viewBox="0 0 760 300" style="width:760px;height:300px;margin-top:40px"><defs><linearGradient id="ga" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0000ff" stop-opacity=".18"/><stop offset="1" stop-color="#0000ff" stop-opacity="0"/></linearGradient></defs><path d="M0 260 L70 248 L140 254 L210 222 L280 228 L350 196 L420 204 L490 150 L560 128 L630 92 L700 60 L760 22 L760 300 L0 300Z" fill="url(#ga)"/><path d="M0 260 L70 248 L140 254 L210 222 L280 228 L350 196 L420 204 L490 150 L560 128 L630 92 L700 60 L760 22" fill="none" stroke="#0000ff" stroke-width="7" stroke-linejoin="round"/></svg>
+      <div class="stats"><div>Churn<b>3.1%</b></div><div>Users<b>10,248</b></div><div>ARPU<b>$12.5</b></div></div>
+      <div class="saved">saved 3 weeks ago</div>
+    </div>
+    <div class="card dark" id="c1">
+      <div class="tw-h"><div class="tw-av"></div><div class="tw-n">Sam Builds<span>@sambuilds · 2h</span></div></div>
+      <div class="tw-t">hot take: your landing page doesn't need a hero video.<br><br>we deleted ours and signups went up 18%.</div>
+      <div class="tw-m"><span>♡ 2.4K</span><span>⟲ 318</span><span>▸ 211K</span></div>
+      <div class="saved">saved 5 months ago</div>
+    </div>
+    <div class="card light" id="c2" style="background:#f7f7fb">
+      <div class="k">Weekly signups</div>
+      <div class="big" style="font-size:110px">+212% <span style="font-size:44px;color:#8a8a8a;letter-spacing:0;font-weight:500">this quarter</span></div>
+      <div id="bars" style="display:flex;align-items:flex-end;gap:16px;height:420px;margin-top:60px"></div>
+      <div class="saved">saved 2 years ago</div>
+    </div>
+    <div class="card light" id="c3">
+      <div class="k">App Store · Top Charts</div>
+      <div class="big" style="font-size:96px;line-height:1.05">Productivity</div>
+      <div id="ranks" style="margin-top:46px;display:grid;gap:30px"></div>
+      <div class="saved">saved in 2021</div>
+    </div>
+    <div id="st0" class="stamp">NEVER POSTED</div>
+    <div id="st1" class="stamp">NEVER POSTED</div>
+    <div id="st2" class="stamp">NEVER POSTED</div>
+    <div id="st3" class="stamp" style="top: 74%">NEVER POSTED</div>
+    <div id="cap3a" class="cap" style="top: 300px"><span>saved it to post later</span></div>
+    <div id="cap3b" class="cap" style="top: 300px"><span>(you never did)</span></div>
+  </div>
+
+  <!-- S4 IdeaBird -->
+  <div id="s4" class="scene">
+    <div id="s4bg" class="layer"></div>
+    <div id="cap4" class="cap" style="top: 200px"><span>7 seconds. 5 posts.</span><br><span>from <em>ONE</em> screenshot.</span></div>
+    <div id="sheet" class="abs">
+      <div id="apphead"><span class="mark" data-bird="#fff"></span>IdeaBird<div id="timer"><i></i><span id="tm">0:00</span></div></div>
+      <div id="up"><div id="upthumb"></div><div id="upstat">Reading screenshot…<small id="upsub">App Store · Top Charts</small></div><div id="scanl"></div></div>
+      <div class="pc" id="p0"><span class="bd">Hot take</span><span class="cp">Copy</span><div class="tx">Nobody tells you the App Store rewards boring consistency.</div></div>
+      <div class="pc" id="p1"><span class="bd">Question</span><span class="cp">Copy</span><div class="tx">What got your app into the top 10? Ours just hit #4.</div></div>
+      <div class="pc" id="p2"><span class="bd">Stat-lead</span><span class="cp">Copy</span><div class="tx">#4 in Productivity. 30 days ago we were #212.</div></div>
+      <div class="pc" id="p3"><span class="bd">Thread</span><span class="cp">Copy</span><div class="tx">1/ How we went from #212 to #4 in 30 days:</div></div>
+      <div class="pc" id="p4"><span class="bd">LinkedIn</span><span class="cp">Copy</span><div class="tx">A month ago we were #212 in Productivity. Today, #4.</div></div>
+    </div>
+  </div>
+
+  <!-- S5 threat -->
+  <div id="s5" class="scene">
+    <div id="s5bg" class="layer"></div>
+    <div id="copy" class="abs">Copy</div>
+    <div id="mini" class="abs"><div class="lbl">Screenshots<span id="mcnt">4,812</span></div><div class="g" id="mg"></div></div>
+  </div>
+
+  <!-- birds and bubbles float above S2–S5 -->
+  <div id="bub2" class="bubble" style="left: 70px; top: 930px; width: 760px"><span id="bt2"></span></div>
+  <div id="bub5" class="bubble" style="left: 90px; top: 300px; width: 900px; font-size: 66px"><span id="bt5"></span></div>
+  <div id="bird" class="bird"></div>
+
+  <!-- S6 end card -->
+  <div id="s6" class="scene">
+    <div id="s6bg" class="layer"></div>
+    <div id="lock" class="abs"><div class="lm" data-bird="#0000ff"></div><div class="lw">IdeaBird</div></div>
+    <div id="cta" class="cap"><span>comment <em>BIRD</em> and</span><br><span>i'll send you the link</span></div>
+    <div id="url" class="abs">ideabird.yasirk.me</div>
+  </div>
+</div>
+
+<script>
+const DURATION = 16.5;
+
+// Each variant swaps the words; every timing stays the same, so one soundtrack fits all.
+const VARIANTS = [
+  { // 0: original, self-confrontation
+    hook: ["go check how many", "screenshots you have.", "i'll wait."], big: "4,812", bigLabel: "screenshots",
+    b2: "4,812 screenshots.\n0 posts.\nwe need to talk.",
+    cap3a: "saved it to post later", cap3b: "(you never did)",
+    saved: ["saved 3 weeks ago", "saved 5 months ago", "saved 2 years ago", "saved in 2021"], stamp: "NEVER POSTED",
+    cap4: ["7 seconds. 5 posts.", "from <em>ONE</em> screenshot."],
+    b5: "post one.\nor i start deleting\nyour camera roll.", cta: ["comment <em>BIRD</em> and", "i'll send you the link"],
+  },
+  { // 1: fake confession
+    hook: ["i need to come clean", "about my camera roll…"], big: "4,812", bigLabel: "screenshots. 0 posted.",
+    b2: "you've been saying\n'posting this soon'\nsince 2021.",
+    cap3a: "'i'll post this tonight'", cap3b: "(it's been 3 years)",
+    saved: ["said 'tonight' 3 weeks ago", "said 'tonight' 5 months ago", "said 'tonight' 2 years ago", "said 'tonight' in 2021"], stamp: "NEVER POSTED",
+    cap4: ["so i tried something.", "<em>5 posts</em> in 7 seconds."],
+    b5: "post one.\nor i post your\nunfinished drafts.", cta: ["comment <em>BIRD</em> if", "you're guilty too"],
+  },
+  { // 2: mascot guilt trip
+    hook: ["you screenshotted that", "chart 3 weeks ago.", "where's the post?"], big: "21", bigLabel: "days. i counted.",
+    b2: "21 days.\nthe chart got old.\ni got sad.",
+    cap3a: "'great post idea'", cap3b: "(still waiting)",
+    saved: ["waiting 21 days", "waiting 5 months", "waiting 2 years", "waiting since 2021"], stamp: "STILL WAITING",
+    cap4: ["it takes <em>7 seconds.</em>", "i timed it."],
+    b5: "post it.\nor i tell your followers\nyou gave up.", cta: ["comment <em>BIRD</em> before", "i get more upset"],
+  },
+  { // 3: big-number challenge
+    hook: ["i turned 1 screenshot", "into 5 posts", "in 7 seconds."], big: "7s", bigLabel: "1 screenshot → 5 posts",
+    b2: "no prompts.\nno blank page.\njust watch.",
+    cap3a: "what you usually do:", cap3b: "(stare. close app.)",
+    saved: ["opened 9 times", "opened 14 times", "opened 22 times", "opened 31 times"], stamp: "OVERTHOUGHT",
+    cap4: ["what i do now:", "<em>1 screenshot.</em> 5 posts."],
+    b5: "steal this one.\nbefore your competitor\ndoes.", cta: ["comment <em>BIRD</em>", "and i'll send the link"],
+  },
+  { // 4: stat confrontation
+    hook: ["what % of your", "'post later' screenshots", "actually got posted?"], big: "0%", bigLabel: "of 4,812 screenshots",
+    b2: "0%.\nthat's not a strategy.\nthat's a hoard.",
+    cap3a: "'content for later'", cap3b: "(later never came)",
+    saved: ["hoarded 3 weeks", "hoarded 5 months", "hoarded 2 years", "hoarded since 2021"], stamp: "HOARDED",
+    cap4: ["turn the hoard into", "<em>5 posts</em> in 7 seconds."],
+    b5: "share one today.\nor i rename this album\n'regrets'.", cta: ["comment <em>BIRD</em>", "and start posting"],
+  },
+  { // 5: POV / identity
+    hook: ["POV: your camera roll", "is your content calendar"], big: "4,812", bigLabel: "posts due 'someday'",
+    b2: "fun fact:\n'someday' is not\na day of the week.",
+    cap3a: "scheduled: someday", cap3b: "(today isn't someday)",
+    saved: ["due: someday", "due: eventually", "due: when i'm ready", "due: never"], stamp: "SOMEDAY",
+    cap4: ["today it took", "<em>7 seconds.</em>"],
+    b5: "pick a day.\nhint:\nit's today.", cta: ["comment <em>BIRD</em>", "and i'll send the link"],
+  },
+];
+const V = VARIANTS[Number(new URLSearchParams(location.search).get('v')) || 0];
+const lines = arr => arr.map(l => `<span>${l}</span>`).join('<br>');
+const $ = id => document.getElementById(id);
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const p = (t, a, b) => clamp((t - a) / (b - a));
+const lerp = (a, b, k) => a + (b - a) * k;
+const eOut = x => 1 - Math.pow(1 - x, 3);
+const eExpo = x => x >= 1 ? 1 : 1 - Math.pow(2, -10 * x);
+const eInOut = x => x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const eBack = x => { const c1 = 1.7, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+const R = i => { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+function set(el, o = {}) {
+  const { x = 0, y = 0, s = 1, r = 0, op = 1, b = 0, sx, sy } = o;
+  let tr = `translate(${x.toFixed(2)}px,${y.toFixed(2)}px)`;
+  if (r) tr += ` rotate(${r.toFixed(3)}deg)`;
+  if (sx !== undefined || sy !== undefined) tr += ` scale(${(sx ?? s).toFixed(4)},${(sy ?? s).toFixed(4)})`; else if (s !== 1) tr += ` scale(${s.toFixed(4)})`;
+  el.style.transform = tr; el.style.opacity = clamp(op).toFixed(3); el.style.filter = b > .05 ? `blur(${b.toFixed(2)}px)` : 'none';
+}
+function vis(el, t, a, b) { const on = t >= a && t < b; el.style.display = on ? '' : 'none'; return on; }
+const pop = (t, a, d = .35) => ({ s: a <= t ? lerp(.6, 1, eBack(p(t, a, a + d))) : .6, op: eOut(p(t, a, a + .12)) });
+
+// ---------- bird (pixel logo cells + an eye, pupil and brow for acting) ----------
+const ROWS = [[36,29,14],[29,36,28],[22,43,14],[43,43,21],[29,50,49],[36,57,35],[43,64,14]];
+const birdSVG = (fill, face = false) => `<svg viewBox="22 29 56 42" shape-rendering="crispEdges">` +
+  ROWS.map(([x, y, w]) => `<rect x="${x}" y="${y}" width="${w}" height="7.05" fill="${fill}"/>`).join('') +
+  (face ? `<rect x="36" y="43" width="7.05" height="7.05" fill="#fff"/><rect id="pupil" x="39" y="45" width="3.4" height="3.4" fill="#000"/><rect id="brow" x="33" y="40.6" width="12" height="2.6" fill="#000" transform="rotate(18 39 42)"/>` : '') + `</svg>`;
+document.querySelectorAll('[data-bird]').forEach(el => el.innerHTML = birdSVG(el.dataset.bird));
+$('bird').innerHTML = birdSVG('#0000ff', true);
+
+// ---------- generated screenshot thumbnails ----------
+function thumb(i) {
+  const dk = R(i + 3) > .55, bg = dk ? ['#111', '#16161d', '#0d1117'][i % 3] : ['#fff', '#f5f6fa', '#fdf8f0'][i % 3];
+  const fg = dk ? 'rgba(255,255,255,.22)' : 'rgba(0,0,0,.12)';
+  const acc = ['#0000ff', '#ff5e62', '#1db954', '#ffb000', '#8b5cf6'][i % 5];
+  let h = `<div class="th" style="background:${bg}">`;
+  h += `<i style="left:8%;top:6%;width:30%;height:4%;background:${fg}"></i>`;
+  const kind = i % 4;
+  if (kind === 0) { h += `<i style="left:8%;top:18%;width:55%;height:11%;background:${dk ? '#fff' : '#111'};opacity:.85"></i>`; for (let k = 0; k < 7; k++) { const hh = 10 + R(i * 7 + k) * 40; h += `<i style="left:${10 + k * 11.5}%;bottom:12%;width:7%;height:${hh}%;background:${k === 6 ? acc : fg}"></i>`; } }
+  else if (kind === 1) { h += `<i style="left:8%;top:18%;width:16%;height:16%;border-radius:50%;background:${acc}"></i>`; for (let k = 0; k < 4; k++) h += `<i style="left:8%;top:${42 + k * 12}%;width:${60 + R(i + k) * 30}%;height:5%;background:${fg}"></i>`; }
+  else if (kind === 2) { for (let k = 0; k < 4; k++) h += `<i style="${k % 2 ? 'right' : 'left'}:8%;top:${16 + k * 19}%;width:${40 + R(i + k * 3) * 30}%;height:12%;border-radius:12px;background:${k % 2 ? acc : fg}"></i>`; }
+  else { h += `<i style="left:8%;top:18%;width:84%;height:40%;border-radius:8px;background:linear-gradient(135deg,${acc},${dk ? '#222' : '#ddd'})"></i>`; for (let k = 0; k < 3; k++) h += `<i style="left:8%;top:${64 + k * 10}%;width:${50 + R(i * 3 + k) * 40}%;height:5%;background:${fg}"></i>`; }
+  return h + '</div>';
+}
+$('grid').innerHTML = Array.from({ length: 64 }, (_, i) => thumb(i)).join('');
+$('mg').innerHTML = Array.from({ length: 12 }, (_, i) => thumb(i + 100)).join('');
+$('upthumb').innerHTML = thumb(3).replace('class="th"', 'class="th" style="height:100%"');
+$('bars').innerHTML = Array.from({ length: 10 }, (_, k) => `<i style="flex:1;border-radius:12px 12px 0 0;display:block;height:${[22, 26, 24, 33, 38, 36, 48, 58, 74, 100][k]}%;background:${k === 9 ? '#0000ff' : '#c6d0ff'}"></i>`).join('');
+$('ranks').innerHTML = [['1', 'Notion', '#111'], ['2', 'Google Drive', '#1a73e8'], ['3', 'Gmail', '#ea4335'], ['4', 'Your App', '#0000ff'], ['5', 'Calendar', '#ff9500']].map(([n, a, c]) =>
+  `<div style="display:flex;align-items:center;gap:34px;font-size:50px;font-weight:${n === '4' ? 800 : 500};${n === '4' ? 'background:#eef1ff;margin:0 -24px;padding:12px 24px;border-radius:26px;' : ''}"><span style="width:50px;color:#8a8a8a;font-weight:600">${n}</span><span style="width:110px;height:110px;border-radius:26px;background:${c};display:block"></span>${a}</div>`).join('');
+
+// ---------- variant text ----------
+$('cap1').innerHTML = lines(V.hook);
+$('bn').textContent = V.big;
+$('bignum').querySelector('span').textContent = V.bigLabel;
+$('cap3a').innerHTML = lines([V.cap3a]);
+$('cap3b').innerHTML = lines([V.cap3b]);
+document.querySelectorAll('.card .saved').forEach((el, i) => el.textContent = V.saved[i]);
+document.querySelectorAll('.stamp').forEach(el => { el.textContent = V.stamp; el.style.fontSize = Math.min(118, Math.floor(118 * 12 / V.stamp.length)) + 'px'; });
+$('cap4').innerHTML = lines(V.cap4);
+$('cta').innerHTML = lines(V.cta);
+
+// ---------- bird choreography ----------
+let BIRD = null;
+function birdState(t) {
+  // S2: slides in from the right, bottom right of the frame
+  if (t < 3.75) {
+    const k = eBack(p(t, 1.95, 2.45));
+    const out = eInOut(p(t, 3.4, 3.75));
+    return { x: lerp(1200, 650, k) + out * 700, y: 1330 + Math.sin(t * 5) * 8, s: 1, r: lerp(-20, 0, k) + Math.sin(t * 9) * 1.5, op: t > 1.9 ? 1 : 0, look: [1.5, -1.5], brow: 0 };
+  }
+  // S5: drops in over the Copy button, menacing
+  if (t >= 11.5 && t < 14.2) {
+    const k = eBack(p(t, 11.6, 12.1));
+    const shake = t > 12.35 && t < 12.75 || t > 13.4 && t < 13.75 ? Math.sin(t * 90) * 10 : 0;
+    const lean = eInOut(p(t, 12.9, 13.9));
+    return { x: 360 + shake, y: lerp(-400, 760, k) + Math.sin(t * 4.5) * 12 + lean * 40, s: 1 + lean * .12, r: Math.sin(t * 3) * 2, op: 1, look: [0, 1], brow: 1 };
+  }
+  return null;
+}
+
+// ---------- scenes ----------
+function r12(t) {
+  if (!vis($('photos'), t, 0, 3.8)) return;
+  const sc = eOut(p(t, 0, 1.55));
+  $('grid').style.transform = `translateY(${(380 - sc * 2400).toFixed(1)}px)`;
+  const n = Math.round(4812 * eOut(p(t, .05, 1.4)));
+  $('cnt').textContent = n.toLocaleString('en-US');
+  const dim = eInOut(p(t, 1.5, 1.85));
+  $('grid').style.filter = dim > .01 ? `blur(${(dim * 14).toFixed(1)}px) brightness(${(1 - dim * .6).toFixed(2)})` : 'none';
+  set($('ph-head'), { op: 1 - dim });
+  // hook caption is fully visible on frame 0, so the cover frame reads
+  set($('cap1'), { op: 1 - p(t, 1.45, 1.6), s: 1 + .02 * Math.sin(Math.min(t, 1.45) * 6), y: -eInOut(p(t, 1.45, 1.6)) * 30 });
+  const bk = p(t, 1.6, 1.95);
+  set($('bignum'), { s: dim > 0 ? lerp(2.2, 1, eExpo(bk)) * (1 + .04 * Math.exp(-(t - 1.95) * 8) * (t > 1.95 ? 1 : 0)) : 0, op: eOut(p(t, 1.6, 1.7)), y: -eInOut(p(t, 3.45, 3.75)) * 60 });
+  $('bignum').style.opacity = eOut(p(t, 1.6, 1.7)) * (1 - p(t, 3.45, 3.75));
+}
+
+function typeInto(el, full, t, t0, cps) { el.textContent = full.slice(0, Math.max(0, Math.min(full.length, Math.floor((t - t0) * cps)))); }
+
+function r2bubble(t) {
+  const on = vis($('bub2'), t, 2.2, 3.75);
+  if (!on) return;
+  const pp = pop(t, 2.25, .4), out = p(t, 3.45, 3.7);
+  set($('bub2'), { s: pp.s * (1 - out * .2), op: pp.op * (1 - out) });
+  typeInto($('bt2'), V.b2, t, 2.3, V.b2.length / .92);
+}
+
+const CARD_T = [3.7, 4.55, 5.4, 6.25];
+function r3(t) {
+  if (!vis($('s3'), t, 3.6, 7.75)) return;
+  for (let i = 0; i < 4; i++) {
+    const a = CARD_T[i], nxt = i < 3 ? CARD_T[i + 1] : 99;
+    const kin = eExpo(p(t, a - .05, a + .22)), kout = eInOut(p(t, nxt - .08, nxt + .14));
+    const el = $('c' + i);
+    // stamp slams on the beat after the card lands, and shakes the card
+    const sa = a + .42, sk = p(t, sa, sa + .16);
+    const shake = t > sa + .1 && t < sa + .45 ? Math.sin((t - sa) * 120) * 9 * Math.exp(-(t - sa) * 10) : 0;
+    let x = lerp(1100, 0, kin) - kout * 1150 + shake, y = 0, r = lerp(14, 0, kin) - kout * 12, s = 1, op = t > a - .06 ? 1 : 0;
+    if (i === 3) {
+      // last card shrinks into the IdeaBird upload slot (thumb centre 170,840; card centre 540,1120)
+      const sh = eInOut(p(t, 7.05, 7.6));
+      x = lerp(x, -370, sh); y = lerp(0, -280, sh); s = lerp(1, .19, sh); r = lerp(r, 0, sh);
+      op *= 1 - p(t, 7.55, 7.65);
+    }
+    set(el, { x, y, r, s, op });
+    set($('st' + i), { x: -kout * 1150 + shake, s: t >= sa ? lerp(2.4, 1, eExpo(sk)) : 0, r: -12 + i * 4 - (i % 2) * 7,
+      op: t >= sa ? eOut(sk) * (i === 3 ? 1 - p(t, 6.95, 7.05) : 1) : 0 });
+  }
+  set($('cap3a'), { op: p(t, 3.75, 3.85) * (1 - p(t, 6.2, 6.3)), s: t < 6.25 ? lerp(.9, 1, eBack(p(t, 3.75, 4.05))) : 1 });
+  set($('cap3b'), { op: p(t, 6.3, 6.4) * (1 - p(t, 6.95, 7.1)), s: lerp(.85, 1, eBack(p(t, 6.3, 6.6))) });
+}
+
+const TICK0 = 7.65, TICK1 = 10.55;
+function r4(t) {
+  if (!vis($('s4'), t, 6.95, 11.95)) return;
+  const bg = eInOut(p(t, 6.95, 7.45));
+  $('s4bg').style.opacity = bg;
+  const shIn = eExpo(p(t, 7.0, 7.6)), ex = eInOut(p(t, 11.45, 11.9));
+  set($('sheet'), { y: (1 - shIn) * 1400 + ex * 200, op: 1 - ex * .9, b: ex * 10 });
+  set($('cap4'), { op: eOut(p(t, 7.7, 7.85)) * (1 - ex), s: lerp(.85, 1, eBack(p(t, 7.7, 8.0))) });
+  // timer: fake-fast 0:00 → 0:07
+  const secs = Math.min(7, Math.floor(7 * p(t, TICK0, TICK1) + .0001));
+  $('tm').textContent = '0:0' + secs;
+  const done = t >= TICK1;
+  $('timer').style.background = done ? '#0000ff' : '#fff0f0';
+  $('timer').style.color = done ? '#fff' : '#d11';
+  $('timer').querySelector('i').style.background = done ? '#fff' : (Math.floor(t * 3) % 2 ? '#e11' : '#f88');
+  set($('timer'), { s: done ? 1 + .14 * Math.exp(-(t - TICK1) * 7) : 1 });
+  // upload card + scan
+  set($('upthumb'), { s: lerp(.6, 1, eBack(p(t, 7.5, 7.8))), op: eOut(p(t, 7.5, 7.6)) });
+  const sk = p(t, 7.8, 8.6);
+  $('scanl').style.top = (sk * 296) + 'px';
+  $('scanl').style.opacity = t > 7.8 && t < 8.65 ? 1 : 0;
+  $('upstat').firstChild.textContent = t < 8.6 ? 'Reading screenshot…' : (t < 10.5 ? 'Writing posts…' : '5 posts ready');
+  $('upsub').textContent = t < 8.6 ? 'App Store · Top Charts' : (t < 10.5 ? `${Math.min(5, Math.max(0, Math.floor((t - 8.65) / .38) + 1))} of 5` : '✓ done');
+  for (let i = 0; i < 5; i++) {
+    const a = 8.7 + i * .38, k = p(t, a, a + .45);
+    const el = $('p' + i); el.style.top = (500 + i * 174) + 'px';
+    set(el, { y: (1 - eExpo(k)) * 120, s: lerp(.9, 1, eBack(k)), op: eOut(p(t, a, a + .15)) });
+  }
+}
+
+function r5(t) {
+  vis($('bub5'), t, 12.0, 14.05);
+  if (!vis($('s5'), t, 11.45, 14.3)) return;
+  set($('s5bg'), { op: eOut(p(t, 11.45, 11.7)) * (1 + .0 * Math.sin(t * 6)) });
+  $('s5bg').style.filter = `brightness(${(1 + .25 * Math.max(0, Math.sin(t * 7))).toFixed(2)})`;
+  const ck = pop(t, 11.55, .45);
+  set($('copy'), { s: ck.s * (1 + .03 * Math.sin(t * 8)), op: ck.op * (1 - p(t, 13.95, 14.1)) });
+  set($('mini'), { y: (1 - eExpo(p(t, 11.7, 12.2))) * 300, op: eOut(p(t, 11.7, 11.9)) * (1 - p(t, 13.95, 14.1)) });
+  const dels = [12.95, 13.3, 13.65];
+  let n = 4812;
+  dels.forEach((d, k) => {
+    if (t >= d) n--;
+    const th = $('mg').children[[4, 9, 1][k]];
+    const kk = p(t, d, d + .25);
+    th.style.transform = `scale(${t < d ? 1 : (1 + .25 * Math.sin(kk * Math.PI)) * (1 - eOut(kk))})`;
+    th.style.opacity = t < d ? 1 : 1 - kk;
+  });
+  $('mcnt').textContent = n.toLocaleString('en-US');
+  const on = vis($('bub5'), t, 12.0, 14.05);
+  if (on) {
+    const pp = pop(t, 12.0, .4);
+    set($('bub5'), { s: pp.s, op: pp.op * (1 - p(t, 13.9, 14.05)) });
+    typeInto($('bt5'), V.b5, t, 12.08, V.b5.length / 1.38);
+  }
+}
+
+function r6(t) {
+  if (!vis($('s6'), t, 13.9, 99)) return;
+  $('s6').style.clipPath = t < 14.6 ? `circle(${(1300 * eExpo(p(t, 13.95, 14.6))).toFixed(1)}px at 540px 900px)` : 'none';
+  const lk = eBack(p(t, 14.15, 14.6));
+  set($('lock').querySelector('.lm'), { s: lerp(.3, 1, lk), r: (1 - eOut(p(t, 14.15, 14.6))) * -20, op: eOut(p(t, 14.15, 14.25)) });
+  set($('lock').querySelector('.lw'), { y: (1 - eExpo(p(t, 14.35, 14.9))) * 60, op: eOut(p(t, 14.35, 14.5)) });
+  const cp = pop(t, 14.75, .45);
+  set($('cta'), { s: cp.s * (t > 15.3 ? 1 + .025 * Math.sin((t - 15.3) * 7) : 1), op: cp.op });
+  set($('url'), { y: (1 - eExpo(p(t, 15.1, 15.6))) * 30, op: eOut(p(t, 15.1, 15.3)) });
+}
+
+window.renderAt = (t) => {
+  r12(t); r2bubble(t); r3(t); r4(t); r5(t); r6(t);
+  const b = birdState(t), el = $('bird');
+  if (!b) { el.style.display = 'none'; return; }
+  el.style.display = '';
+  set(el, { x: b.x, y: b.y, s: b.s, r: b.r, op: b.op });
+  const blink = (t % 2.3) > 2.18 ? .15 : 1;
+  const pu = $('pupil'); pu.setAttribute('x', 39 + b.look[0] * .9 - 1.7 + 1.7); pu.setAttribute('y', 45 + b.look[1] * .9);
+  pu.setAttribute('height', (3.4 * blink).toFixed(2));
+  $('brow').style.opacity = b.brow;
+};
+window.renderFrame = window.renderAt;
+window.DURATION = DURATION;
+window.SIZE = { width: 1080, height: 1920 };
+
+Promise.all(['700 68px "Google Sans Flex"', '800 300px "Google Sans Flex"', '500 30px "Geist Mono"'].map(f => document.fonts.load(f)))
+  .then(() => document.fonts.ready).then(() => {
+    // long single-word stamps shrink until they fit inside the border
+    document.querySelectorAll('.stamp').forEach(el => { let f = parseFloat(el.style.fontSize); while (el.scrollWidth > el.clientWidth && f > 40) el.style.fontSize = (f -= 4) + 'px'; });
+    window.renderAt(0);
+    window.READY = true;
+    if (!navigator.webdriver) {
+      const start = performance.now();
+      const tick = () => { window.renderAt(((performance.now() - start) / 1000) % DURATION); requestAnimationFrame(tick); };
+      requestAnimationFrame(tick);
+    }
+  });
+</script>
+</body>
+</html>

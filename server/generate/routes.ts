@@ -60,8 +60,8 @@ generateRouter.post('/', requireAuth, async (req, res) => {
   const plan = PLANS[user.plan] ?? PLANS.free;
   if ((await reserveGeneration(user.id, plan.id)) === null) return limitReached(res, user, plan);
 
-  // Write Like Me: the stored style profile, if on. Null (default voice) on any problem.
-  const voice = config().writeLikeMe ? await voiceForGeneration(user.id) : null;
+  // Write Like Me (Pro): the stored style profile, if on. Null (default voice) on any problem.
+  const voice = config().writeLikeMe && plan.limits.writeLikeMe ? await voiceForGeneration(user.id) : null;
   // Pro: tone and standing instructions. Null when not Pro or nothing is set.
   const preferences = await preferencesForGeneration(user);
 
@@ -146,7 +146,7 @@ generateRouter.post('/thread', requireAuth, async (req, res) => {
 
   if ((await reserveGeneration(user.id, plan.id)) === null) return limitReached(res, user, plan);
 
-  const voice = config().writeLikeMe ? await voiceForGeneration(user.id) : null;
+  const voice = config().writeLikeMe && plan.limits.writeLikeMe ? await voiceForGeneration(user.id) : null;
   const preferences = await preferencesForGeneration(user);
 
   let thread;

@@ -6,6 +6,8 @@ import type { ToastType } from './types';
 export interface VoiceStatus {
   /** False when the server has no X app configured: the feature is hidden. */
   available: boolean;
+  /** Write Like Me is Pro: false on Free, where the app shows the upgrade card. */
+  pro: boolean;
   connection: { username: string; status: 'active' | 'expired' } | null;
   profile: {
     summary: string;

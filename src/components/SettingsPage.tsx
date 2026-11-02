@@ -80,7 +80,7 @@ export function SettingsPage({ active, draftCount, voice, onUpgrade, showToast }
 
         <WritingPreferencesCard plan={user.plan} onUpgrade={onUpgrade} showToast={showToast} />
 
-        <WriteLikeMeCard controls={voice} />
+        <WriteLikeMeCard controls={voice} onUpgrade={onUpgrade} />
 
         <section className="settings-card">
           <header>

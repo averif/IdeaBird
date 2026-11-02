@@ -209,8 +209,12 @@ beforeEach(async () => {
 });
 
 let n = 0;
-async function makeUser() {
-  const [row] = await query<{ id: string }>(`INSERT INTO users (email, email_verified) VALUES ($1, true) RETURNING id`, [`voice${++n}-${Date.now()}@example.com`]);
+// Write Like Me is Pro, so test users are Pro unless a test says otherwise.
+async function makeUser(plan: 'free' | 'pro' = 'pro') {
+  const [row] = await query<{ id: string }>(`INSERT INTO users (email, email_verified, plan) VALUES ($1, true, $2) RETURNING id`, [
+    `voice${++n}-${Date.now()}@example.com`,
+    plan,
+  ]);
   return { id: row.id, token: await signAccessToken({ sub: row.id, ver: 0 }) };
 }
 type User = Awaited<ReturnType<typeof makeUser>>;
@@ -475,7 +479,6 @@ describe('learning the voice', () => {
 describe('generation with Write Like Me', () => {
   test('without a profile, generation works as before', async () => {
     const user = await makeUser();
-    await query(`UPDATE users SET plan = 'pro' WHERE id = $1`, [user.id]);
     const r = await generate(user);
     assert.equal(r.status, 200, r.text);
     assert.equal(r.data.voice, false);
@@ -538,6 +541,39 @@ describe('generation with Write Like Me', () => {
     assert.equal(status.data.profile, null);
     assert.equal((await generate(b)).data.voice, false);
     assert.equal((await api('PATCH', '/api/voice', { user: b, body: { enabled: false } })).status, 404);
+  });
+});
+
+describe('Write Like Me on Free', () => {
+  test('connecting, learning and the toggle are Pro only', async () => {
+    const user = await makeUser('free');
+    const status = await api('GET', '/api/voice', { user });
+    assert.equal(status.status, 200);
+    assert.equal(status.data.pro, false);
+    for (const [method, path, body] of [
+      ['POST', '/api/voice/connect'],
+      ['POST', '/api/voice/refresh'],
+      ['PATCH', '/api/voice', { enabled: true }],
+    ] as const) {
+      const r = await api(method, path, { user, body });
+      assert.equal(r.status, 403, `${method} ${path}`);
+      assert.equal(r.data.code, 'pro_required');
+    }
+  });
+
+  test('a voice learned on Pro stops applying after moving to Free, and X can still be disconnected', async () => {
+    const user = await makeUser();
+    await connectAndLearn(user);
+    await query(`UPDATE users SET plan = 'free' WHERE id = $1`, [user.id]);
+
+    const r = await generate(user);
+    assert.equal(r.status, 200, r.text);
+    assert.equal(r.data.voice, false);
+    assert.doesNotMatch(writerPrompts.at(-1)!, /VOICE PROFILE/);
+
+    const off = await api('DELETE', '/api/voice', { user });
+    assert.equal(off.status, 200);
+    assert.equal(off.data.connection, null);
   });
 });
 

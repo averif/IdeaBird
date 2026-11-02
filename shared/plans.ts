@@ -18,6 +18,8 @@ export interface PlanLimits {
   threadExpansion: boolean;
   /** Paste a post and get it back polished (Refine page). */
   refine: boolean;
+  /** Write Like Me: learn the user's style from their X posts and write in it. */
+  writeLikeMe: boolean;
 }
 
 export interface Plan {
@@ -53,6 +55,7 @@ export const PLANS: Record<PlanId, Plan> = {
       customVoice: false,
       threadExpansion: false,
       refine: false,
+      writeLikeMe: false,
     },
   },
   pro: {
@@ -71,6 +74,7 @@ export const PLANS: Record<PlanId, Plan> = {
       customVoice: true,
       threadExpansion: true,
       refine: true,
+      writeLikeMe: true,
     },
   },
 };

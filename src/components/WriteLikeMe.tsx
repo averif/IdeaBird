@@ -29,7 +29,7 @@ function Switch({ checked, disabled, label, onChange }: { checked: boolean; disa
 }
 
 /** Settings card: connect X, see the learned voice, toggle, refresh, disconnect. */
-export function WriteLikeMeCard({ controls }: { controls: VoiceControls }) {
+export function WriteLikeMeCard({ controls, onUpgrade }: { controls: VoiceControls; onUpgrade: () => void }) {
   const { voice, learning, busy, learn, connect, setEnabled, disconnect } = controls;
   if (!voice) return null;
 
@@ -38,11 +38,38 @@ export function WriteLikeMeCard({ controls }: { controls: VoiceControls }) {
 
   return (
     <section className="settings-card" id="write-like-me">
-      <header>
+      <header className="settings-card-head">
         <h3>Write Like Me</h3>
+        <span className="badge">Pro</span>
       </header>
 
-      {!voice.available ? (
+      {!voice.pro ? (
+        <div className="settings-actions">
+          <div className="settings-action">
+            <span className="settings-icon"><PenIcon /></span>
+            <div>
+              <strong>Write in your own voice</strong>
+              <p>Connect X and IdeaBird learns how you write from your recent posts, so every draft sounds like you. Read-only: it never posts for you.</p>
+            </div>
+            <button className="btn btn-primary btn-sm" type="button" onClick={onUpgrade}>
+              Upgrade to Pro
+            </button>
+          </div>
+          {/* Moved to Free with X still connected: they can still remove it. */}
+          {connection && (
+            <div className="settings-action">
+              <span className="settings-icon"><UnlinkIcon /></span>
+              <div>
+                <strong>Disconnect X</strong>
+                <p>Connected as @{connection.username}. Disconnecting revokes IdeaBird's access and deletes your voice profile.</p>
+              </div>
+              <button className="btn btn-ghost btn-sm btn-danger" type="button" disabled={locked} onClick={disconnect}>
+                Disconnect
+              </button>
+            </div>
+          )}
+        </div>
+      ) : !voice.available ? (
         <div className="settings-actions">
           <div className="settings-action">
             <span className="settings-icon"><PenIcon /></span>
@@ -166,7 +193,7 @@ export function WriteLikeMeCard({ controls }: { controls: VoiceControls }) {
 export function VoiceToggle({ controls }: { controls: VoiceControls }) {
   const { voice, busy, learning, setEnabled } = controls;
   const profile = voice?.profile;
-  if (!voice?.available || !profile) return null;
+  if (!voice?.available || !voice.pro || !profile) return null;
 
   return (
     <div className="voice-toggle">

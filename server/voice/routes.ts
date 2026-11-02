@@ -7,6 +7,7 @@ import { aiBudgetMs } from '../generate/routes.js';
 import { HttpError, parseBody } from '../http.js';
 import { rateLimit } from '../security/rateLimit.js';
 import { accessTokenFor, decrypt, deleteConnection, encrypt, getConnection, markExpired, ReconnectRequired, saveConnection, sha256 } from './connection.js';
+import { PLANS, type PlanId } from '../../shared/plans.js';
 import { analyzeVoice, measuredTraits, MIN_POSTS, normalizeProfile } from './profile.js';
 import { loadProfile } from './store.js';
 import { buildAuthorizeUrl, exchangeCode, fetchRecentPosts, getMe, randomToken, XApiError } from './xClient.js';
@@ -38,12 +39,23 @@ function assertConfigured() {
   if (!config().xClientId) throw new HttpError(503, 'Write Like Me is not set up on this server.');
 }
 
+const proOnly = (plan: PlanId) => !(PLANS[plan] ?? PLANS.free).limits.writeLikeMe;
+
+/** Write Like Me is Pro. Disconnecting (and seeing the status) stays open to everyone. */
+function assertPro(plan: PlanId, res: Response): boolean {
+  if (!proOnly(plan)) return true;
+  res.status(403).json({ code: 'pro_required', error: 'Write Like Me is part of IdeaBird Pro.' });
+  return false;
+}
+
 /** The current user's Write Like Me state. Only ever their own connection and profile. */
-async function status(userId: string) {
+async function status(userId: string, plan: PlanId) {
   const [connection, row] = await Promise.all([getConnection(userId), loadProfile(userId)]);
   const profile = row ? normalizeProfile(row.profile, row.profile.stats) : null;
   return {
     available: Boolean(config().xClientId),
+    /** False on Free: the app shows the upgrade card instead. */
+    pro: !proOnly(plan),
     connection: connection ? { username: connection.username, status: connection.status } : null,
     profile:
       row && profile
@@ -61,13 +73,15 @@ async function status(userId: string) {
 }
 
 voiceRouter.get('/', requireAuth, async (req, res) => {
-  res.json(await status(currentUser(req).id));
+  const user = currentUser(req);
+  res.json(await status(user.id, user.plan));
 });
 
 /** Starts the X authorization: returns X's consent URL for the browser to open. */
 voiceRouter.post('/connect', requireAuth, async (req, res) => {
   assertConfigured();
   const user = currentUser(req);
+  if (!assertPro(user.plan, res)) return;
   await rateLimit({ key: `voice-connect:${user.id}`, max: 10, windowSeconds: 60 * 60 });
 
   const state = randomToken();
@@ -182,6 +196,7 @@ function sendVoiceError(res: Response, err: unknown) {
 voiceRouter.post('/refresh', requireAuth, async (req, res) => {
   assertConfigured();
   const user = currentUser(req);
+  if (!assertPro(user.plan, res)) return;
   await rateLimit({
     key: `voice-refresh:${user.id}`,
     max: 6,
@@ -215,7 +230,7 @@ voiceRouter.post('/refresh', requireAuth, async (req, res) => {
          model = EXCLUDED.model, updated_at = now()`,
       [user.id, JSON.stringify(profile), posts.length, model]
     );
-    return res.json(await status(user.id));
+    return res.json(await status(user.id, user.plan));
   } catch (err) {
     return sendVoiceError(res, err);
   }
@@ -223,16 +238,17 @@ voiceRouter.post('/refresh', requireAuth, async (req, res) => {
 
 voiceRouter.patch('/', requireAuth, async (req, res) => {
   const user = currentUser(req);
+  if (!assertPro(user.plan, res)) return;
   const { enabled } = parseBody(z.object({ enabled: z.boolean() }), req.body);
   const updated = await query(`UPDATE voice_profiles SET enabled = $2 WHERE user_id = $1 RETURNING user_id`, [user.id, enabled]);
   if (!updated.length) throw new HttpError(404, 'Connect X first so IdeaBird can learn your voice.');
-  res.json(await status(user.id));
+  res.json(await status(user.id, user.plan));
 });
 
 /** Disconnect X: revokes the tokens and deletes the profile. */
 voiceRouter.delete('/', requireAuth, async (req, res) => {
   const user = currentUser(req);
   await deleteConnection(user.id);
-  res.json(await status(user.id));
+  res.json(await status(user.id, user.plan));
 });
 

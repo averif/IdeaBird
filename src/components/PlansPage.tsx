@@ -131,6 +131,11 @@ function ProFeatures({ usage, onNavigate }: ProFeaturesProps) {
       link: { label: 'Set in Settings', page: 'settings' },
     },
     {
+      title: 'Write Like Me',
+      detail: 'Connect X and IdeaBird learns how you write, so every draft sounds like you.',
+      link: { label: 'Set up in Settings', page: 'settings' },
+    },
+    {
       title: 'X thread expansion',
       detail: 'Turn any draft into a numbered X thread with "Expand into thread".',
     },
