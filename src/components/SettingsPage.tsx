@@ -128,9 +128,9 @@ export function SettingsPage({ active, draftCount, voice, onUpgrade, showToast }
             <div className="settings-action">
               <span className="settings-icon"><ShieldIcon /></span>
               <div>
-                <strong>Your screenshots aren't stored</strong>
+                <strong>Your links and screenshots aren't stored</strong>
                 <p>
-                  Images are analyzed and discarded.{' '}
+                  Pages, transcripts and images are analyzed and discarded.{' '}
                   {user.plan === 'pro'
                     ? 'Only a short summary and your drafts are saved, and you can delete them from History.'
                     : "On Free, your drafts aren't saved either."}

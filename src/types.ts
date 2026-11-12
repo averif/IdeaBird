@@ -7,7 +7,18 @@ export interface Tweet {
   tweet: string;
 }
 
-/** IdeaBird's understanding of a screenshot (mirrors server/vision/insight.ts). */
+/** Where a link-based insight came from (mirrors server/vision/insight.ts). */
+export interface InsightSource {
+  kind: 'youtube' | 'article' | 'x' | 'reddit';
+  url: string;
+  title: string;
+  siteName?: string;
+  author?: string;
+  /** Set when the content was partial, e.g. a video without captions. */
+  note?: string;
+}
+
+/** IdeaBird's understanding of a screenshot or link (mirrors server/vision/insight.ts). */
 export interface ScreenshotInsight {
   summary: string;
   keyFacts: string[];
@@ -16,6 +27,8 @@ export interface ScreenshotInsight {
   possibleStories: string[];
   contentAngles: string[];
   uncertainties: string[];
+  /** Set for insights from a pasted link. */
+  source?: InsightSource;
 }
 
 /** An insight plus the server's signature, required to generate posts from it. */

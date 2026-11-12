@@ -60,7 +60,7 @@ export function ResultsStep({
       <div className="page-head">
         <div>
           <h2>Drafts</h2>
-          <p>{tweets.length > 1 ? `${tweets.length} takes on your screenshot. Click a card to copy it.` : 'Your post. Click it to copy.'}</p>
+          <p>{tweets.length > 1 ? `${tweets.length} takes on your source. Click a card to copy it.` : 'Your post. Click it to copy.'}</p>
         </div>
         <div className="page-actions">
           <button className="btn btn-ghost btn-sm" type="button" disabled={isGenerating} onClick={onRegenerate}>

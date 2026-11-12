@@ -1,4 +1,5 @@
-import type { ScreenshotInsight } from '../types';
+import type { InsightSource, ScreenshotInsight } from '../types';
+import { ArticleIcon, PlayIcon, ThreadIcon } from './icons';
 import type { VoiceControls } from '../voice';
 import { VoiceToggle } from './WriteLikeMe';
 
@@ -11,6 +12,8 @@ export interface AnalysisStatus {
 interface InsightsStepProps {
   active: boolean;
   previewUrl: string | null;
+  /** The pasted link being read, when the source is a link rather than a screenshot. */
+  link: string | null;
   insight: ScreenshotInsight | null;
   status: AnalysisStatus;
   selectedAngle: string | null;
@@ -27,6 +30,7 @@ interface InsightsStepProps {
 export function InsightsStep({
   active,
   previewUrl,
+  link,
   insight,
   status,
   selectedAngle,
@@ -45,20 +49,24 @@ export function InsightsStep({
       <div className="page-head">
         <div>
           <h2>Insights</h2>
-          <p>What IdeaBird found. Pick an angle, or let it choose.</p>
+          <p>What IdeaBird found{link ? ' in the link' : ''}. Pick an angle, or let it choose.</p>
         </div>
       </div>
 
       <div className="extract-layout">
-        <div className="preview-card">
-          <div className="panel-header">
-            <span>Screenshot</span>
-            <span className="panel-meta">source</span>
+        {link ? (
+          <LinkCard url={link} source={insight?.source ?? null} loading={status.active} />
+        ) : (
+          <div className="preview-card">
+            <div className="panel-header">
+              <span>Screenshot</span>
+              <span className="panel-meta">source</span>
+            </div>
+            <div className="preview-frame">
+              <img id="preview-image" src={previewUrl ?? undefined} alt="Uploaded screenshot" />
+            </div>
           </div>
-          <div className="preview-frame">
-            <img id="preview-image" src={previewUrl ?? undefined} alt="Uploaded screenshot" />
-          </div>
-        </div>
+        )}
 
         <div className="insight-card" aria-live="polite" aria-busy={status.active}>
           <div className="panel-header">
@@ -169,5 +177,68 @@ export function InsightsStep({
         </div>
       </div>
     </section>
+  );
+}
+
+const KIND_LABELS: Record<InsightSource['kind'], string> = {
+  youtube: 'YouTube video',
+  article: 'Article',
+  x: 'X post',
+  reddit: 'Reddit thread',
+};
+
+function youtubeThumbnail(url: string): string | null {
+  try {
+    const id = new URL(url).searchParams.get('v');
+    return id && /^[\w-]{11}$/.test(id) ? `https://i.ytimg.com/vi/${id}/hqdefault.jpg` : null;
+  } catch {
+    return null;
+  }
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+}
+
+/** The pasted link: what it is, who made it, and a way back to it. */
+function LinkCard({ url, source, loading }: { url: string; source: InsightSource | null; loading: boolean }) {
+  const kind = source?.kind;
+  const KindIcon = kind === 'youtube' ? PlayIcon : kind === 'x' || kind === 'reddit' ? ThreadIcon : ArticleIcon;
+  const thumbnail = kind === 'youtube' && source ? youtubeThumbnail(source.url) : null;
+  const byline = [source?.author, source?.siteName && source.siteName !== source.author ? source.siteName : null].filter(Boolean).join(' · ');
+
+  return (
+    <div className="preview-card link-card">
+      <div className="panel-header">
+        <span>Link</span>
+        <span className="panel-meta">{kind ? KIND_LABELS[kind].toLowerCase() : 'source'}</span>
+      </div>
+      <div className="link-card-body">
+        {thumbnail && <img className="link-thumb" src={thumbnail} alt="" loading="lazy" />}
+        <span className="link-kind">
+          <KindIcon size={14} />
+          {kind ? KIND_LABELS[kind] : loading ? 'Reading…' : 'Link'}
+        </span>
+        {source ? (
+          <>
+            <h3 className="link-title">{source.title}</h3>
+            {byline && <p className="link-byline">{byline}</p>}
+          </>
+        ) : (
+          <div className="skeleton-lines" aria-hidden="true">
+            <span /><span />
+          </div>
+        )}
+        <a className="link-url" href={source?.url ?? url} target="_blank" rel="noreferrer noopener">
+          {hostOf(source?.url ?? url)}
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7" /><path d="M8 7h9v9" /></svg>
+        </a>
+        {source?.note && <p className="insight-note">{source.note}</p>}
+      </div>
+    </div>
   );
 }

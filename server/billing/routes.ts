@@ -5,7 +5,7 @@ import { config } from '../config.js';
 import { query } from '../db/index.js';
 import { HttpError, parseBody } from '../http.js';
 import { rateLimit } from '../security/rateLimit.js';
-import { usageFor } from './usage.js';
+import { refineUsageFor, usageFor } from './usage.js';
 import { activeOffer } from '../../shared/plans.js';
 import { availableIntervals, customerIdSql, dodo, dodoMode, productFor, SubscriptionMismatch, syncSubscription } from './dodo.js';
 
@@ -35,6 +35,8 @@ async function billingStatus(userId: string) {
     /** A Dodo customer exists, so the billing portal can open. */
     canManage: Boolean(row?.dodo_customer_id),
     usage: await usageFor(userId, row?.plan ?? 'free'),
+    /** Free's separate refine allowance; null on Pro (refines use generations). */
+    refines: await refineUsageFor(userId, row?.plan ?? 'free'),
   };
 }
 

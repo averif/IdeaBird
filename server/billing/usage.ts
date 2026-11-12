@@ -51,3 +51,38 @@ export async function releaseGeneration(userId: string): Promise<void> {
     [userId]
   );
 }
+
+// Free's separate refine allowance (PLANS.free.limits.refinesPerMonth). Pro has
+// none: its refines use generations, through the functions above.
+
+export async function refineUsageFor(userId: string, plan: PlanId): Promise<Usage | null> {
+  const limit = PLANS[plan].limits.refinesPerMonth;
+  if (limit === null) return null;
+  const [row] = await query<{ refines: number }>(
+    `SELECT refines FROM usage_monthly WHERE user_id = $1 AND month = date_trunc('month', now() AT TIME ZONE 'UTC')::date`,
+    [userId]
+  );
+  return { used: row?.refines ?? 0, limit, resetsAt: nextMonthStart() };
+}
+
+/** Claims one refine, atomically like reserveGeneration. Null when used up. */
+export async function reserveRefine(userId: string, limit: number): Promise<number | null> {
+  if (limit <= 0) return null;
+  const [row] = await query<{ refines: number }>(
+    `INSERT INTO usage_monthly (user_id, month, refines)
+     VALUES ($1, date_trunc('month', now() AT TIME ZONE 'UTC')::date, 1)
+     ON CONFLICT (user_id, month) DO UPDATE SET refines = usage_monthly.refines + 1
+       WHERE usage_monthly.refines < $2
+     RETURNING refines`,
+    [userId, limit]
+  );
+  return row?.refines ?? null;
+}
+
+export async function releaseRefine(userId: string): Promise<void> {
+  await query(
+    `UPDATE usage_monthly SET refines = refines - 1
+      WHERE user_id = $1 AND month = date_trunc('month', now() AT TIME ZONE 'UTC')::date AND refines > 0`,
+    [userId]
+  );
+}

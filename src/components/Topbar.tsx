@@ -36,7 +36,7 @@ export function Topbar({ title, crumb, onMenu, children, showPasteHint }: Topbar
           <span className="kbd-hint">
             <kbd>{IS_MAC ? '⌘' : 'Ctrl'}</kbd>
             <kbd>V</kbd>
-            to paste
+            to paste a link or screenshot
           </span>
         )}
       </div>
@@ -47,7 +47,7 @@ export function Topbar({ title, crumb, onMenu, children, showPasteHint }: Topbar
 /** The 3-step progress shown on Create. */
 export function StepProgress({ step }: { step: 'upload' | 'insights' | 'copy' }) {
   const steps = [
-    { id: 'upload', label: 'Upload' },
+    { id: 'upload', label: 'Source' },
     { id: 'insights', label: 'Insights' },
     { id: 'copy', label: 'Drafts' },
   ] as const;

@@ -11,18 +11,18 @@ interface LandingProps {
   onSignup: () => void;
 }
 
-const READS = ['Dashboards', 'Charts', 'Tweets', 'Product UIs', 'Analytics', 'Articles', 'Changelogs', 'Spreadsheets', 'Landing pages', 'Reviews'];
+const READS = ['YouTube videos', 'Podcasts', 'Blog posts', 'Articles', 'Newsletters', 'X posts', 'Reddit threads', 'Dashboards', 'Charts', 'Screenshots'];
 
 const STEPS = [
   {
     n: '01',
-    title: 'Drop a screenshot',
-    body: 'Paste, drag or upload. A dashboard, a chart, a tweet, a product page: anything with a story in it.',
+    title: 'Paste a link',
+    body: 'A YouTube video, a podcast, a blog post or an article. Or drop a screenshot of a dashboard, a chart or a tweet.',
   },
   {
     n: '02',
     title: 'IdeaBird finds the story',
-    body: 'A vision model reads it like a strategist: the numbers, the trend, the tension, and the angles worth posting about.',
+    body: 'It reads the whole thing like a strategist, transcript and all: the big ideas, the numbers, the tension, and the angles worth posting about.',
   },
   {
     n: '03',
@@ -32,10 +32,10 @@ const STEPS = [
 ];
 
 const FEATURES = [
-  { title: 'Sees, not just reads', body: 'Understands charts, layouts and UI, not only the text. Small print gets a second look when it matters.' },
-  { title: 'Angles, not summaries', body: 'Every screenshot comes back with possible stories and angles, so posts say something instead of repeating it.' },
-  { title: 'Exact numbers', body: 'Metrics, names and dates are carried over exactly as shown. Anything unclear is never stated as fact.' },
-  { title: 'Five formats at once', body: 'A hot take, a question, a stat-led post, a thread and a LinkedIn version from a single screenshot.' },
+  { title: 'Reads the whole thing', body: 'Hour-long podcasts, YouTube videos and long articles are read end to end, not just the title. Screenshots are seen, charts and all.' },
+  { title: 'Angles, not summaries', body: 'Every link and screenshot comes back with possible stories and angles, so posts say something instead of repeating it.' },
+  { title: 'Exact facts', body: 'Metrics, names, dates and quotes are carried over exactly as the source states them. Anything unclear is never stated as fact.' },
+  { title: 'Five formats at once', body: 'A hot take, a question, a stat-led post, a thread and a LinkedIn version from a single link or screenshot.' },
   { title: 'Private history', body: 'Every generation is saved to your account. Only you can see it, and you can delete it any time.' },
   { title: 'Built-in guardrails', body: "IdeaBird won't amplify unverified allegations, conspiracy claims or health misinformation." },
 ];
@@ -67,6 +67,10 @@ const FAQ = [
     a: "ChatGPT is a blank box: you upload the screenshot, explain the context, write a prompt, ask for each format, then check that the numbers survived. IdeaBird is built for this one job. It reads the screenshot first, pulls out the exact metrics and the stories worth telling, and lets you pick the angle. Then it writes a post that's ready to publish. On Pro you get five at once: a hot take, a question, a stat-led post, a thread and a LinkedIn version, all saved to your history. Numbers are kept exactly as shown, and anything unclear is never stated as fact. No prompting, no copy-pasting, and no posts that sound like everyone else's AI.",
   },
   {
+    q: 'Which links work?',
+    a: "YouTube videos and podcasts (read from their captions, even hour-long ones), blog posts, articles, newsletters, X posts and Reddit threads. Pages behind a login or paywall can't be read: screenshot the part you care about instead.",
+  },
+  {
     q: 'What kind of screenshots work best?',
     a: 'Anything with a point to it: analytics dashboards, revenue charts, product launches, tweets, articles, reviews, changelogs. If a person could explain why it matters, IdeaBird can too.',
   },
@@ -75,8 +79,8 @@ const FAQ = [
     a: "No. A vision model looks at the whole image, works out what it means, and suggests stories and angles. The writer works from that understanding, so posts tell a story instead of rewriting what's on screen.",
   },
   {
-    q: 'Are my screenshots stored?',
-    a: 'No. The image is analyzed and discarded. Only a short summary of what it showed and the posts you generated are saved to your private history, and you can delete them.',
+    q: 'Are my links and screenshots stored?',
+    a: 'No. The page, transcript or image is analyzed and discarded. Only a short summary of what it showed (plus the link itself) and the posts you generated are saved to your private history, and you can delete them.',
   },
   {
     q: 'Which platforms are the posts for?',
@@ -84,7 +88,7 @@ const FAQ = [
   },
   {
     q: 'What counts as a generation?',
-    a: `Each time you turn a screenshot into posts. Free includes ${PLANS.free.limits.generationsPerMonth} a month with one post each; Pro includes ${PLANS.pro.limits.generationsPerMonth.toLocaleString('en-US')} a month with all ${PLANS.pro.limits.draftsPerGeneration} variations.`,
+    a: `Each time you turn a link or screenshot into posts. Free includes ${PLANS.free.limits.generationsPerMonth} a month with one post each; Pro includes ${PLANS.pro.limits.generationsPerMonth.toLocaleString('en-US')} a month with all ${PLANS.pro.limits.draftsPerGeneration} variations.`,
   },
 ];
 
@@ -172,15 +176,15 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
 
           <div className="lp-hero-copy">
             <p className="lp-kicker">
-              <span className="lp-dot" aria-hidden="true" /> Screenshot in. Posts out.
+              <span className="lp-dot" aria-hidden="true" /> Link in. Posts out.
             </p>
             <h1>
-              Every screenshot
+              Every link
               <br />
               has a story.
             </h1>
             <p className="lp-sub">
-              IdeaBird looks at your screenshot, finds what's worth saying, and writes five ready-to-post drafts for X and LinkedIn.
+              Paste a YouTube video, podcast or article, or drop a screenshot. IdeaBird finds what's worth saying and writes five ready-to-post drafts for X and LinkedIn.
             </p>
             <div className="lp-cta">
               <button className="lp-btn lp-btn-primary" type="button" onClick={onSignup}>
@@ -196,7 +200,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
 
         {/* --- What it reads --- */}
         <section className="lp-reads" aria-label="What IdeaBird can read">
-          <p className="lp-mono">Reads anything you screenshot</p>
+          <p className="lp-mono">Reads anything you can link or screenshot</p>
           <div className="lp-marquee">
             <div className="lp-marquee-track">
               {[...READS, ...READS].map((item, i) => (
@@ -212,7 +216,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
         <section className="lp-section" id="how">
           <div className="lp-head lp-reveal">
             <p className="lp-mono">How it works</p>
-            <h2>From pixels to posts in three steps.</h2>
+            <h2>From link to posts in three steps.</h2>
           </div>
 
           <div className="lp-flow lp-reveal">
@@ -315,7 +319,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
           <div className="lp-formats lp-reveal">
             <div className="lp-formats-copy">
               <p className="lp-mono">Five formats</p>
-              <h2>One screenshot. Five ways to say it.</h2>
+              <h2>One source. Five ways to say it.</h2>
               <p className="lp-body">
                 Each draft is written for its platform: punchy single posts for X, a numbered thread, and a LinkedIn version that reads like a person wrote it.
               </p>
@@ -350,7 +354,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
           <div className="lp-head lp-reveal">
             <p className="lp-mono">Pricing</p>
             <h2>Start free. Go Pro when it clicks.</h2>
-            <p className="lp-body">Free gives you one solid post per screenshot. Pro gives you every angle, 500 generations a month, and a history of everything you've made.</p>
+            <p className="lp-body">Free gives you one solid post per link or screenshot. Pro gives you every angle, 500 generations a month, and a history of everything you've made.</p>
           </div>
           <PricingPlans
             context="landing"
@@ -384,7 +388,7 @@ export default function Landing({ onLogin, onSignup }: LandingProps) {
         {/* --- Final CTA --- */}
         <section className="lp-final lp-reveal">
           <p className="lp-final-dots" aria-hidden="true">IDEABIRD</p>
-          <h2>Your next post is already in your screenshots.</h2>
+          <h2>Your next post is already in your open tabs.</h2>
           <div className="lp-cta">
             <button className="lp-btn lp-btn-primary lp-btn-on-blue" type="button" onClick={onSignup}>
               <span className="lp-btn-square" aria-hidden="true" />

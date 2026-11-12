@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { currentUser, requireAuth } from '../auth/middleware.js';
-import { releaseGeneration, reserveGeneration, usageFor } from '../billing/usage.js';
+import { refineUsageFor, releaseGeneration, releaseRefine, reserveGeneration, reserveRefine, usageFor } from '../billing/usage.js';
 import { config } from '../config.js';
 import { aiBudgetMs, limitReached, sendAiError } from '../generate/routes.js';
 import type { GenerateError } from '../generateService.js';
@@ -13,8 +13,9 @@ import { countWords, refinePost } from './refine.js';
 export const refineRouter = Router();
 
 /**
- * Pro: polish a post the user wrote. Counts as one generation, like every other
- * AI call. Nothing is stored: the post goes to the model and back.
+ * Polish a post the user wrote. On Pro it counts as one generation, like every
+ * other AI call; Free has its own monthly refine allowance. Nothing is stored:
+ * the post goes to the model and back.
  */
 refineRouter.post('/', requireAuth, async (req, res) => {
   const user = currentUser(req);
@@ -39,13 +40,25 @@ refineRouter.post('/', requireAuth, async (req, res) => {
   );
   if (countWords(body.text) < 3) throw new HttpError(400, 'Paste a post of at least a few words to refine.');
 
-  if ((await reserveGeneration(user.id, plan.id)) === null) return limitReached(res, user, plan);
+  const refineLimit = plan.limits.refinesPerMonth;
+  if (refineLimit === null) {
+    if ((await reserveGeneration(user.id, plan.id)) === null) return limitReached(res, user, plan);
+  } else if ((await reserveRefine(user.id, refineLimit)) === null) {
+    const refines = await refineUsageFor(user.id, plan.id);
+    const resets = new Date(refines!.resetsAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' });
+    return res.status(402).json({
+      code: 'limit_reached',
+      error: `You've used all ${refineLimit} free refines this month. Upgrade to Pro to refine with your ${PLANS.pro.limits.generationsPerMonth.toLocaleString('en-US')} monthly generations, or wait until ${resets}.`,
+      refines,
+    });
+  }
+  const giveBack = () => (refineLimit === null ? releaseGeneration(user.id) : releaseRefine(user.id));
 
   let result;
   try {
     result = await refinePost(body, { budgetMs: aiBudgetMs() });
   } catch (err) {
-    await releaseGeneration(user.id).catch(() => {});
+    await giveBack().catch(() => {});
     return sendAiError(res, err as GenerateError);
   }
 
@@ -55,5 +68,7 @@ refineRouter.post('/', requireAuth, async (req, res) => {
     changes: result.changes,
     model: result.model,
     usage: await usageFor(user.id, plan.id),
+    // Free only: the separate refine allowance. null on Pro.
+    refines: await refineUsageFor(user.id, plan.id),
   });
 });

@@ -83,7 +83,7 @@
             <li><strong>Account details:</strong> your email, your name if you give it, and whether your email is verified. Passwords are stored only as a secure one-way hash, never in readable form.</li>
             <li><strong>Google sign-in:</strong> if you use Google, we receive your Google account ID, email and name. We don't get access to your other Google data.</li>
             <li><strong>Sessions:</strong> for each signed-in device we keep a hashed session token, your browser's user agent and your IP address. This keeps you signed in and helps us spot misuse.</li>
-            <li><strong>Your history:</strong> a short summary of each screenshot and the drafts IdeaBird wrote for it.</li>
+            <li><strong>Your history:</strong> a short summary of each screenshot or link (for links, also its address and title) and the drafts IdeaBird wrote for it.</li>
             <li><strong>Write Like Me</strong>, only if you connect X: see section 03.</li>
             <li><strong>Usage counts:</strong> how many posts you generated this month, so we can apply your plan's limit, plus short-lived counters per account, IP address or email for rate limits and to block repeated failed logins.</li>
             <li><strong>Billing</strong> (only if you subscribe to Pro): your plan, billing period, subscription status, renewal date, and the customer and subscription IDs from our payment provider. <strong>We never see or store your card or bank details;</strong> the payment provider handles them.</li>
@@ -95,9 +95,10 @@
           <h2>Screenshots and drafts</h2>
           <ul>
             <li>When you upload a screenshot, it's sent to our AI provider (NVIDIA) to be analyzed, then discarded. We don't store the image.</li>
+            <li>When you paste a link, our server fetches that public page (for a YouTube video: its captions and description) and sends the text to our AI provider to be analyzed, then discards it. The website you link to sees a request from our server, not from you. We don't store the page's content.</li>
             <li>If small text is hard to read, IdeaBird may run text recognition <strong>in your browser</strong>. That text is sent along with the analysis and isn't stored on its own.</li>
             <li>On Pro, the summary and the drafts are saved in your private history. Nobody else can see them, and you can delete any item from History. On Free, drafts aren't saved.</li>
-            <li>When you use <em>Refine</em> (Pro), the post you paste is sent to our AI provider to be edited and returned to you. We don't store the post or the refined version.</li>
+            <li>When you use <em>Refine</em>, the post you paste is sent to our AI provider to be edited and returned to you. We don't store the post or the refined version.</li>
           </ul>
         </section>
 
@@ -158,7 +159,7 @@
           <p class="mono num">07</p>
           <h2>Retention and deletion</h2>
           <ul>
-            <li><strong>Screenshots and X posts:</strong> not stored. They're discarded after processing.</li>
+            <li><strong>Screenshots, linked pages and X posts:</strong> not stored. They're discarded after processing.</li>
             <li><strong>History:</strong> kept until you delete it. If you move from Pro to Free, saved drafts stay in your account, hidden, and come back if you upgrade again.</li>
             <li><strong>Billing records:</strong> we keep your plan and subscription details while you have an account. Dodo Payments keeps payment and invoice records as tax and accounting law requires.</li>
             <li><strong>Voice profile and X tokens:</strong> kept until you disconnect X or delete your account.</li>

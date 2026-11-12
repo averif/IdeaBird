@@ -77,6 +77,11 @@ export function analyzeScreenshot(image: string) {
   return postJson<AnalyzeResponse>('/api/analyze', { image });
 }
 
+/** Link step (the core flow): the server reads the page or video transcript. */
+export function analyzeLink(url: string) {
+  return postJson<AnalyzeResponse>('/api/link', { url });
+}
+
 /** Fallback step: merge OCR text into the analysis as supporting evidence. */
 export function refineWithOcr(analysis: Analysis, ocrText: string) {
   return postJson<AnalyzeResponse>('/api/analyze/refine', { ...analysis, ocrText });
@@ -92,10 +97,12 @@ export interface RefineResponse {
   refined?: string;
   changes?: string[];
   usage?: Usage;
+  /** Free's refine allowance after this refine; null on Pro. */
+  refines?: Usage | null;
   error?: string;
 }
 
-/** Pro: polish a post the user wrote, keeping their voice and length. */
+/** Polish a post the user wrote (Pro, or Free's monthly refines). */
 export function refinePost(text: string, platform: RefinePlatform) {
   return postJson<RefineResponse>('/api/refine', { text, platform });
 }

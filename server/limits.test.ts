@@ -331,12 +331,42 @@ describe('Refine', () => {
   const POST = 'honestly the thing nobody tells you about launching is the first week is really quiet and thats totally normal';
   const refine = (user: User, body: Record<string, unknown> = { text: POST, platform: 'x' }) => api('POST', '/api/refine', user, body);
 
-  test('is a Pro feature and costs Free users nothing', async () => {
+  test('Free gets its own monthly refines, separate from generations', async () => {
     const user = await makeUser('free');
+    const limit = PLANS.free.limits.refinesPerMonth!;
     const r = await refine(user);
-    assert.equal(r.status, 403);
-    assert.equal(r.data.code, 'pro_required');
+    assert.equal(r.status, 200, r.text);
+    assert.equal(r.data.refined, REFINED.refined);
+    assert.equal((r.data.refines as { used: number; limit: number }).used, 1);
+    assert.equal((r.data.refines as { used: number; limit: number }).limit, limit);
+    // Generations are untouched.
+    assert.equal((r.data.usage as { used: number }).used, 0);
+
+    const billing = await api('GET', '/api/billing', user);
+    assert.equal((billing.data.refines as { used: number }).used, 1);
+    assert.equal((billing.data.usage as { used: number }).used, 0);
+  });
+
+  test('Free is stopped after its monthly refines, without calling the model', async () => {
+    const user = await makeUser('free');
+    const limit = PLANS.free.limits.refinesPerMonth!;
+    await query(
+      `INSERT INTO usage_monthly (user_id, month, refines) VALUES ($1, date_trunc('month', now() AT TIME ZONE 'UTC')::date, $2)`,
+      [user.id, limit]
+    );
+    const r = await refine(user);
+    assert.equal(r.status, 402);
+    assert.equal(r.data.code, 'limit_reached');
+    assert.match(r.data.error as string, new RegExp(`all ${limit} free refines`));
     assert.equal(prompts.length, 0);
+  });
+
+  test('a failed Free refine gives the refine back', async () => {
+    const user = await makeUser('free');
+    refineAnswers = ['not json'];
+    assert.notEqual((await refine(user)).status, 200);
+    const billing = await api('GET', '/api/billing', user);
+    assert.equal((billing.data.refines as { used: number }).used, 0);
   });
 
   test('returns the polished post and counts one generation', async () => {
@@ -347,6 +377,8 @@ describe('Refine', () => {
     // The slip fixed in code is named first.
     assert.deepEqual(r.data.changes, ["thats → that's", ...REFINED.changes]);
     assert.equal((r.data.usage as { used: number }).used, 1);
+    // Pro has no separate refine allowance.
+    assert.equal(r.data.refines, null);
 
     const prompt = prompts.at(-1)!;
     assert.match(prompt, /POST TO REFINE:[\s\S]*the first week is really quiet and that's totally normal/);

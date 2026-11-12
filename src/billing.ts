@@ -12,6 +12,8 @@ export interface BillingStatus {
   cancelsAtPeriodEnd: boolean;
   canManage: boolean;
   usage: Usage;
+  /** Free's separate refine allowance; null on Pro (refines use generations). */
+  refines: Usage | null;
 }
 
 /**

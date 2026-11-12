@@ -196,3 +196,46 @@ export const SparkIcon = () => (
     <path d="m12 8 1.5 2.5L16 12l-2.5 1.5L12 16l-1.5-2.5L8 12l2.5-1.5Z" />
   </Icon>
 );
+
+export const LinkIcon = ({ size = 16 }: { size?: number }) => (
+  <Icon size={size}>
+    <path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" />
+    <path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" />
+  </Icon>
+);
+
+export const PlayIcon = ({ size = 16 }: { size?: number }) => (
+  <Icon size={size}>
+    <rect x="2.5" y="5" width="19" height="14" rx="4" />
+    <path d="m10 9.2 5 2.8-5 2.8Z" />
+  </Icon>
+);
+
+export const ArticleIcon = ({ size = 16 }: { size?: number }) => (
+  <Icon size={size}>
+    <rect x="4" y="3" width="16" height="18" rx="2.5" />
+    <path d="M8 8h8M8 12h8M8 16h5" />
+  </Icon>
+);
+
+export const MicIcon = ({ size = 16 }: { size?: number }) => (
+  <Icon size={size}>
+    <rect x="9" y="3" width="6" height="11" rx="3" />
+    <path d="M5 11a7 7 0 0 0 14 0" />
+    <path d="M12 18v3" />
+  </Icon>
+);
+
+export const ThreadIcon = ({ size = 16 }: { size?: number }) => (
+  <Icon size={size}>
+    <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z" />
+  </Icon>
+);
+
+export const ImageIcon = ({ size = 16 }: { size?: number }) => (
+  <Icon size={size}>
+    <rect x="3" y="4" width="18" height="16" rx="3" />
+    <path d="m3 15 4.5-4.5a2 2 0 0 1 2.8 0L15 15" />
+    <circle cx="15.5" cy="8.5" r="1.2" />
+  </Icon>
+);

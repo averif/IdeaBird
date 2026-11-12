@@ -6,6 +6,7 @@ import { billingRouter } from './billing/routes.js';
 import { config, ConfigError } from './config.js';
 import { generateRouter } from './generate/routes.js';
 import { historyRouter } from './history/routes.js';
+import { linkRouter } from './link/routes.js';
 import { preferencesRouter } from './preferences/routes.js';
 import { refineRouter } from './refine/routes.js';
 import { analyzeRouter } from './vision/routes.js';
@@ -58,6 +59,7 @@ export function createApp() {
 
   app.use('/api/auth', authRouter);
   app.use('/api/analyze', analyzeRouter);
+  app.use('/api/link', linkRouter);
   app.use('/api/generate', generateRouter);
   app.use('/api/history', historyRouter);
   app.use('/api/voice', voiceRouter);

@@ -87,6 +87,8 @@ CREATE TABLE IF NOT EXISTS usage_monthly (
   generations  integer NOT NULL DEFAULT 0,
   PRIMARY KEY (user_id, month)
 );
+-- Free: refines have their own monthly allowance (Pro's use generations).
+ALTER TABLE usage_monthly ADD COLUMN IF NOT EXISTS refines integer NOT NULL DEFAULT 0;
 
 -- Pro: tone and standing writing instructions applied to every generation.
 CREATE TABLE IF NOT EXISTS writing_preferences (

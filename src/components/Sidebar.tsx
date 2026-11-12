@@ -116,7 +116,6 @@ export function Sidebar({
               <span>{label}</span>
               {target === 'history' && recent && recent.length > 0 && <span className="nav-count">{recent.length}</span>}
               {target === 'plans' && user?.plan === 'pro' && <span className="nav-pro">Pro</span>}
-              {target === 'refine' && user?.plan !== 'pro' && <span className="nav-pro nav-pro-muted">Pro</span>}
             </button>
           ))}
         </nav>

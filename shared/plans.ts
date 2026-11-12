@@ -18,6 +18,11 @@ export interface PlanLimits {
   threadExpansion: boolean;
   /** Paste a post and get it back polished (Refine page). */
   refine: boolean;
+  /**
+   * Refines allowed per calendar month, counted on their own. null = no separate
+   * allowance: each refine uses one generation instead (Pro).
+   */
+  refinesPerMonth: number | null;
   /** Write Like Me: learn the user's style from their X posts and write in it. */
   writeLikeMe: boolean;
 }
@@ -45,7 +50,7 @@ export const PLANS: Record<PlanId, Plan> = {
   free: {
     id: 'free',
     name: 'Free',
-    tagline: 'Try IdeaBird on your best screenshots.',
+    tagline: 'Try IdeaBird on your best links and screenshots.',
     monthlyPrice: 0,
     yearlyPrice: 0,
     limits: {
@@ -54,7 +59,8 @@ export const PLANS: Record<PlanId, Plan> = {
       history: false,
       customVoice: false,
       threadExpansion: false,
-      refine: false,
+      refine: true,
+      refinesPerMonth: 15,
       writeLikeMe: false,
     },
   },
@@ -74,6 +80,7 @@ export const PLANS: Record<PlanId, Plan> = {
       customVoice: true,
       threadExpansion: true,
       refine: true,
+      refinesPerMonth: null,
       writeLikeMe: true,
     },
   },

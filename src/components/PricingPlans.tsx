@@ -44,7 +44,12 @@ const ROWS: Row[] = [
   { label: 'Write Like Me', hint: 'learns your voice from X', value: (p) => soon(p.limits.writeLikeMe, 'writeLikeMe') },
   { label: 'Saved drafts and history', value: (p) => p.limits.history },
   { label: 'X thread expansion', value: (p) => soon(p.limits.threadExpansion, 'threadExpansion') },
-  { label: 'Refine your own posts', hint: 'X and LinkedIn', value: (p) => soon(p.limits.refine, 'refine') },
+  {
+    label: 'Refine your own posts',
+    hint: 'X and LinkedIn',
+    // Free: its own monthly number. Pro: uses generations, so effectively the full allowance.
+    value: (p) => (p.limits.refinesPerMonth !== null ? `${number(p.limits.refinesPerMonth)} a month` : soon(p.limits.refine, 'refine')),
+  },
 ];
 
 /** An included feature that isn't built yet shows as "Coming soon". */
@@ -65,7 +70,11 @@ function highlights(plan: Plan): { text: string; included: boolean; soon?: boole
     { text: 'Custom tone and writing instructions', included: limits.customVoice, soon: limits.customVoice && COMING_SOON.customVoice },
     { text: 'Write Like Me: posts in your own voice', included: limits.writeLikeMe, soon: limits.writeLikeMe && COMING_SOON.writeLikeMe },
     { text: 'X thread expansion', included: limits.threadExpansion, soon: limits.threadExpansion && COMING_SOON.threadExpansion },
-    { text: 'Refine your own X and LinkedIn posts', included: limits.refine, soon: limits.refine && COMING_SOON.refine },
+    {
+      text: limits.refinesPerMonth !== null ? `${number(limits.refinesPerMonth)} post refines a month` : 'Refine your own X and LinkedIn posts',
+      included: limits.refine,
+      soon: limits.refine && COMING_SOON.refine,
+    },
   ];
 }
 

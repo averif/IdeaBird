@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
-import { PLANS } from '../../shared/plans';
 import { ApiCodeError, AuthRequiredError, refinePost, type RefinePlatform } from '../api';
 import type { ToastType, Usage } from '../types';
 import './refine.css';
@@ -9,6 +8,9 @@ interface RefinePageProps {
   isPro: boolean;
   usage: Usage | null;
   onUsage: (usage: Usage) => void;
+  /** Free only: the separate monthly refine allowance. */
+  refineUsage: Usage | null;
+  onRefineUsage: (usage: Usage | null) => void;
   onUpgrade: () => void;
   onAuthRequired: () => void;
   showToast: (message: string, type?: ToastType, duration?: number) => void;
@@ -58,8 +60,8 @@ function markEdits(original: string, refined: string): { text: string; edited: b
   return out;
 }
 
-/** Pro: paste a post, get it back polished in the writer's own voice and length. */
-export function RefinePage({ active, isPro, usage, onUsage, onUpgrade, onAuthRequired, showToast }: RefinePageProps) {
+/** Paste a post, get it back refined. Pro uses generations; Free has a monthly number of refines. */
+export function RefinePage({ active, isPro, usage, onUsage, refineUsage, onRefineUsage, onUpgrade, onAuthRequired, showToast }: RefinePageProps) {
   const [draft, setDraft] = useState('');
   const [platform, setPlatform] = useState<RefinePlatform>('x');
   const [platformTouched, setPlatformTouched] = useState(false);
@@ -86,8 +88,8 @@ export function RefinePage({ active, isPro, usage, onUsage, onUpgrade, onAuthReq
   }, [draft, platformTouched]);
 
   useEffect(() => {
-    if (active && isPro) inputRef.current?.focus();
-  }, [active, isPro]);
+    if (active) inputRef.current?.focus();
+  }, [active]);
 
   const scrollToEnd = () => requestAnimationFrame(() => endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }));
 
@@ -97,6 +99,7 @@ export function RefinePage({ active, isPro, usage, onUsage, onUpgrade, onAuthReq
       if (!data.refined) throw new Error('IdeaBird did not receive a refined post.');
       setTurns((all) => all.map((t) => (t.id === id ? { ...t, status: 'done', refined: data.refined, changes: data.changes ?? [] } : t)));
       if (data.usage) onUsage(data.usage);
+      if (data.refines !== undefined) onRefineUsage(data.refines);
     } catch (err) {
       if (err instanceof AuthRequiredError) {
         setTurns((all) => all.filter((t) => t.id !== id));
@@ -105,6 +108,7 @@ export function RefinePage({ active, isPro, usage, onUsage, onUpgrade, onAuthReq
       }
       if (err instanceof ApiCodeError && (err.code === 'limit_reached' || err.code === 'pro_required')) {
         showToast(err.message, 'error', 8000);
+        if (!isPro && refineUsage) onRefineUsage({ ...refineUsage, used: refineUsage.limit });
         setTurns((all) => all.filter((t) => t.id !== id));
         onUpgrade();
         return;
@@ -166,38 +170,9 @@ export function RefinePage({ active, isPro, usage, onUsage, onUpgrade, onAuthReq
 
   const overX = platform === 'x' && draft.length > X_LIMIT;
   const left = usage ? Math.max(0, usage.limit - usage.used) : null;
-
-  if (!isPro) {
-    return (
-      <section className={`step step-refine${active ? ' active' : ''}`} id="step-refine">
-        <div className="page-head">
-          <div>
-            <h2>Refine</h2>
-            <p>Paste a post you wrote. IdeaBird tightens it and keeps your voice.</p>
-          </div>
-        </div>
-        <div className="refine-locked">
-          <div className="refine-example" aria-hidden="true">
-            <p className="refine-example-before">manifestation leads to obsession. obsession leads to success</p>
-            <p className="refine-example-after">
-              Manifestation lights the fire. Obsession feeds it until nothing else can burn. Success is what remains when the flame has
-              consumed every distraction.
-            </p>
-          </div>
-          <div>
-            <strong>Refine is part of Pro</strong>
-            <p>
-              Turn a rough thought or a plain post into eloquent, quotable writing for X or LinkedIn, keeping your idea and facts.
-              Pro includes {PLANS.pro.limits.generationsPerMonth.toLocaleString('en-US')} generations a month.
-            </p>
-          </div>
-          <button className="btn btn-primary btn-sm" type="button" onClick={onUpgrade}>
-            Upgrade to Pro
-          </button>
-        </div>
-      </section>
-    );
-  }
+  // Free: refines come from their own monthly allowance.
+  const refinesLeft = !isPro && refineUsage ? Math.max(0, refineUsage.limit - refineUsage.used) : null;
+  const outOfRefines = refinesLeft === 0;
 
   return (
     <section className={`step step-refine${active ? ' active' : ''}`} id="step-refine">
@@ -330,7 +305,7 @@ export function RefinePage({ active, isPro, usage, onUsage, onUpgrade, onAuthReq
             <span className={`refine-count${overX ? ' over' : ''}`}>
               {platform === 'x' ? `${draft.length}/${X_LIMIT}` : `${draft.length.toLocaleString('en-US')}/${MAX_LENGTH.toLocaleString('en-US')}`}
             </span>
-            <button className="refine-send" type="submit" disabled={busy || !draft.trim()} aria-label="Refine post">
+            <button className="refine-send" type="submit" disabled={busy || !draft.trim() || outOfRefines} aria-label="Refine post">
               <svg viewBox="0 0 24 24" aria-hidden="true">
                 <path d="M12 19V5" />
                 <path d="m5 12 7-7 7 7" />
@@ -338,10 +313,23 @@ export function RefinePage({ active, isPro, usage, onUsage, onUpgrade, onAuthReq
             </button>
           </div>
         </div>
-        <p className="refine-hint">
-          Enter to refine, Shift+Enter for a new line. Each refine uses one generation
-          {left !== null ? ` (${left.toLocaleString('en-US')} left this month)` : ''}.
-        </p>
+        {isPro ? (
+          <p className="refine-hint">
+            Enter to refine, Shift+Enter for a new line. Each refine uses one generation
+            {left !== null ? ` (${left.toLocaleString('en-US')} left this month)` : ''}.
+          </p>
+        ) : outOfRefines ? (
+          <p className="refine-hint">
+            You've used all {refineUsage!.limit} free refines this month.{' '}
+            <button type="button" onClick={onUpgrade}>Upgrade to Pro</button> to keep refining.
+          </p>
+        ) : (
+          <p className="refine-hint">
+            Enter to refine, Shift+Enter for a new line.
+            {refinesLeft !== null ? ` ${refinesLeft} of ${refineUsage!.limit} free refines left this month.` : ''}{' '}
+            <button type="button" onClick={onUpgrade}>Upgrade</button> for more.
+          </p>
+        )}
       </form>
     </section>
   );

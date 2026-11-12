@@ -118,7 +118,7 @@ function ProFeatures({ usage, onNavigate }: ProFeaturesProps) {
     },
     {
       title: `${limits.draftsPerGeneration} post variations per generation`,
-      detail: 'A hot take, a question, a stat-led post, a thread and a LinkedIn version of every screenshot.',
+      detail: 'A hot take, a question, a stat-led post, a thread and a LinkedIn version of every link or screenshot.',
     },
     {
       title: 'Saved drafts and generation history',

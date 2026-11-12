@@ -121,7 +121,7 @@ export function HistoryStep({ active, items, openId, onOpenChange, onDeleted, on
           </div>
           <div className="history-source">
             <div className="panel-header">
-              <span>Screenshot summary</span>
+              <span>Source summary</span>
             </div>
             <p>{showingItem.sourceText}</p>
           </div>
@@ -154,7 +154,7 @@ export function HistoryStep({ active, items, openId, onOpenChange, onDeleted, on
             </div>
           ) : filtered.length === 0 ? (
             <div className="history-empty">
-              <p>{query ? 'No drafts match your search.' : 'No drafts yet. Generate posts from a screenshot and they will appear here.'}</p>
+              <p>{query ? 'No drafts match your search.' : 'No drafts yet. Generate posts from a link or screenshot and they will appear here.'}</p>
               {!query && (
                 <button className="btn btn-primary btn-sm" type="button" onClick={onNew}>
                   <PlusIcon />
@@ -165,7 +165,7 @@ export function HistoryStep({ active, items, openId, onOpenChange, onDeleted, on
           ) : (
             <div className="history-table" role="table" aria-label="Drafts">
               <div className="history-table-head" role="row">
-                <span role="columnheader">Screenshot</span>
+                <span role="columnheader">Source</span>
                 <span role="columnheader">Created</span>
                 <span role="columnheader" className="sr-only">Actions</span>
               </div>
