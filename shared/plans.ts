@@ -70,9 +70,9 @@ export const PLANS: Record<PlanId, Plan> = {
     tagline: 'For people who post every week.',
     // Must match the Dodo products (DODO_PRODUCT_ID, DODO_PRODUCT_ID_YEARLY):
     // Dodo charges the product's price, this only displays it.
-    monthlyPrice: 4.99,
-    // Two months free compared with paying monthly.
-    yearlyPrice: 49.7,
+    monthlyPrice: 9,
+    // About two months free compared with paying monthly.
+    yearlyPrice: 89,
     limits: {
       generationsPerMonth: 500,
       draftsPerGeneration: 5,

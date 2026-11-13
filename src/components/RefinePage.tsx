@@ -24,7 +24,41 @@ interface Turn {
   refined?: string;
   changes?: string[];
   error?: string;
+  /** A built-in example: shown instantly, no refine used. */
+  sample?: boolean;
 }
+
+/**
+ * Before/after examples shown instantly from the empty state, so people see
+ * what Refine does without spending a refine. Written in Refine's own style.
+ */
+const SAMPLES: { label: string; input: string; platform: RefinePlatform; refined: string; changes: string[] }[] = [
+  {
+    label: 'A one-line thought',
+    input: 'consistency beats talent',
+    platform: 'x',
+    refined:
+      'Talent is a spark: bright, sudden, and gone by morning. Consistency is the hearth. It asks for nothing grand, only that you return each day and tend it, and in time it warms a whole house while the spark is still being admired.',
+    changes: ['Turned the claim into an image: spark against hearth', 'Expanded one line into a short, quotable piece', 'Ended on the payoff of showing up'],
+  },
+  {
+    label: 'A rough tweet',
+    input: 'shipped my first app after 8 months. only 12 users so far but honestly im proud of it',
+    platform: 'x',
+    refined:
+      "8 months of building, and today it ships. Only 12 users so far, but every one of them is a stranger who chose to try something I made from nothing. I'm proud of it. Small beginnings aren't small to the one who began.",
+    changes: ["im → I'm", 'Gave the 12 users weight instead of apologizing for them', 'Closed on a line worth quoting'],
+  },
+  {
+    label: 'A LinkedIn post',
+    input:
+      'I got rejected from 30 jobs last year. It was hard but I learned a lot about myself. Now I have a job I love. Dont give up if you are going through the same thing.',
+    platform: 'linkedin',
+    refined:
+      "Last year, 30 companies told me no.\n\nEach rejection felt like a verdict at the time. Looking back, they were closer to a chisel: every no cut away a version of my career I thought I wanted, until what remained was the one I actually did.\n\nToday I have a job I love, and I would not trade a single one of those 30 letters for it.\n\nIf you're in the middle of your own string of no's, don't give up. You're not being refused. You're being shaped.",
+    changes: ["Dont → Don't",'Recast the rejections as a chisel rather than a verdict', 'Opened on a standalone line and ended on a reframe'],
+  },
+];
 
 const X_LIMIT = 280;
 const MAX_LENGTH = 3000;
@@ -136,9 +170,15 @@ export function RefinePage({ active, isPro, usage, onUsage, refineUsage, onRefin
     run(id, input, platform);
   };
 
+  const showSample = (sample: (typeof SAMPLES)[number]) => {
+    const id = nextId.current++;
+    setTurns((all) => [...all, { id, input: sample.input, platform: sample.platform, status: 'done', refined: sample.refined, changes: sample.changes, sample: true }]);
+    scrollToEnd();
+  };
+
   const retry = (turn: Turn) => {
     if (busy) return;
-    setTurns((all) => all.map((t) => (t.id === turn.id ? { ...t, status: 'loading', error: undefined } : t)));
+    setTurns((all) => all.map((t) => (t.id === turn.id ? { ...t, status: 'loading', error: undefined, sample: false } : t)));
     run(turn.id, turn.input, turn.platform);
   };
 
@@ -197,11 +237,15 @@ export function RefinePage({ active, isPro, usage, onUsage, refineUsage, onRefin
       <div className="refine-thread">
         {turns.length === 0 && (
           <div className="refine-empty">
-            <p>Try a one-line thought, a tweet, or a LinkedIn post up to 3,000 characters.</p>
+            <p>Paste a one-line thought, a tweet, or a LinkedIn post up to 3,000 characters. Or see an example first:</p>
             <ul>
-              <li>Short thoughts grow into full, quotable posts</li>
-              <li>Timeless wording, rhythm and imagery</li>
-              <li>Your idea and facts stay the same</li>
+              {SAMPLES.map((sample) => (
+                <li key={sample.label}>
+                  <button type="button" onClick={() => showSample(sample)}>
+                    {sample.label}
+                  </button>
+                </li>
+              ))}
             </ul>
           </div>
         )}
@@ -234,7 +278,7 @@ export function RefinePage({ active, isPro, usage, onUsage, refineUsage, onRefin
             {turn.status === 'done' && turn.refined && (
               <div className="refine-output">
                 <div className="refine-output-head">
-                  <span className="refine-label">Refined</span>
+                  <span className="refine-label">{turn.sample ? 'Refined · example, no refine used' : 'Refined'}</span>
                   {turn.platform === 'x' && (
                     <span className="refine-meta">
                       <span className={turn.refined.length > X_LIMIT ? 'over' : ''}>{turn.refined.length}/{X_LIMIT}</span>
@@ -256,8 +300,13 @@ export function RefinePage({ active, isPro, usage, onUsage, refineUsage, onRefin
                   </ul>
                 )}
                 <div className="refine-actions">
-                  <button className="btn btn-ghost btn-sm" type="button" disabled={busy} onClick={() => retry(turn)}>
-                    Try another version
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    type="button"
+                    disabled={busy || (turn.sample && outOfRefines)}
+                    onClick={() => retry(turn)}
+                  >
+                    {turn.sample ? 'Refine it live' : 'Try another version'}
                   </button>
                   <button className="btn btn-ghost btn-sm" type="button" onClick={() => editOriginal(turn)}>
                     Edit original
